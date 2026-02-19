@@ -1,0 +1,17 @@
+[project]
+name = "s33-modem-mon"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "httpx>=0.28.1",
+    "psycopg2-binary>=2.9.11",
+]
+
+[tool.uv]
+package = true
+
+[project.scripts]
+s33 = "s33mon.s33:main"
+s33mon = "s33mon.mon:main"
