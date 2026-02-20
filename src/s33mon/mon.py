@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS customer_status_connection_info (
 );
 
 CREATE TABLE IF NOT EXISTS downstream_channel (
+    pulled_at          TIMESTAMPTZ      NOT NULL,
     pull_id            BIGINT           NOT NULL,
     channel_id         INT              NOT NULL,
     lock_status        TEXT             NOT NULL,
@@ -70,10 +71,11 @@ CREATE TABLE IF NOT EXISTS downstream_channel (
     snr_db             DOUBLE PRECISION NOT NULL,
     corrected_count    BIGINT           NOT NULL,
     uncorrectable_count BIGINT          NOT NULL,
-    PRIMARY KEY (pull_id, channel_id)
+    PRIMARY KEY (pulled_at, pull_id, channel_id)
 );
 
 CREATE TABLE IF NOT EXISTS upstream_channel (
+    pulled_at    TIMESTAMPTZ      NOT NULL,
     pull_id      BIGINT           NOT NULL,
     channel_id   INT              NOT NULL,
     lock_status  TEXT             NOT NULL,
@@ -81,7 +83,7 @@ CREATE TABLE IF NOT EXISTS upstream_channel (
     width_hz     BIGINT           NOT NULL,
     frequency_hz BIGINT           NOT NULL,
     power_dbmv   DOUBLE PRECISION NOT NULL,
-    PRIMARY KEY (pull_id, channel_id)
+    PRIMARY KEY (pulled_at, pull_id, channel_id)
 );
 
 -- No pull_id. Deduplicated by (timestamp_at, level, message).
@@ -187,6 +189,14 @@ def setup_schema(conn) -> None:
             "SELECT create_hypertable('log_entry', 'timestamp_at', if_not_exists => TRUE);"
         )
 
+        # Hypertables for channel signal data (highest-volume, most query-valuable tables)
+        cur.execute(
+            "SELECT create_hypertable('downstream_channel', 'pulled_at', if_not_exists => TRUE);"
+        )
+        cur.execute(
+            "SELECT create_hypertable('upstream_channel', 'pulled_at', if_not_exists => TRUE);"
+        )
+
         # Unique index for log deduplication. Must include partition column (timestamp_at).
         # ON CONFLICT in insert_pull references this index.
         cur.execute("""
@@ -201,8 +211,8 @@ def setup_schema(conn) -> None:
 def insert_pull(conn, stats: ModemStats) -> int:
     """Insert one pull and all associated stat rows. Returns the pull id."""
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO pull (pulled_at) VALUES (NOW()) RETURNING id;")
-        pull_id: int = cur.fetchone()[0]
+        cur.execute("INSERT INTO pull (pulled_at) VALUES (NOW()) RETURNING id, pulled_at;")
+        pull_id, pulled_at = cur.fetchone()
 
         if ss := stats.get("customer_status_startup_sequence"):
             cur.execute(
@@ -250,12 +260,13 @@ def insert_pull(conn, stats: ModemStats) -> int:
                     cur,
                     """
                     INSERT INTO downstream_channel (
-                        pull_id, channel_id, lock_status, modulation, frequency_hz,
+                        pulled_at, pull_id, channel_id, lock_status, modulation, frequency_hz,
                         power_dbmv, snr_db, corrected_count, uncorrectable_count
                     ) VALUES %s
                     """,
                     [
                         (
+                            pulled_at,
                             pull_id,
                             ch.channel_id,
                             ch.lock_status,
@@ -276,12 +287,13 @@ def insert_pull(conn, stats: ModemStats) -> int:
                     cur,
                     """
                     INSERT INTO upstream_channel (
-                        pull_id, channel_id, lock_status, channel_type,
+                        pulled_at, pull_id, channel_id, lock_status, channel_type,
                         width_hz, frequency_hz, power_dbmv
                     ) VALUES %s
                     """,
                     [
                         (
+                            pulled_at,
                             pull_id,
                             ch.channel_id,
                             ch.lock_status,
@@ -517,6 +529,14 @@ def main() -> None:
         except Exception:
             logger.exception("Error during pull — will retry next interval.")
             raised = True
+            try:
+                conn.close()
+            except Exception:
+                pass
+            try:
+                conn = connect(db_cfg)
+            except Exception:
+                logger.exception("Failed to reconnect to database.")
 
         # try again sooner if we had an error, to recover faster
         sleep_time = args.interval if not raised else min(60, args.interval)
