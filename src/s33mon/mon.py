@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import psycopg2
 import psycopg2.extras
 
+from s33mon.ip import OwnIp, get_own_ip
 from s33mon.s33 import HNAPClient, ModemStats, get_all_hnap_actions
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,11 @@ CREATE TABLE IF NOT EXISTS arris_configuration_info (
     energy_efficient_ethernet BOOLEAN NOT NULL,
     led_status                BOOLEAN NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS own_ip (
+    pull_id BIGINT NOT NULL PRIMARY KEY,
+    ip      TEXT   NOT NULL
+);
 """
 
 
@@ -208,7 +214,7 @@ def setup_schema(conn) -> None:
     logger.info("Schema is ready.")
 
 
-def insert_pull(conn, stats: ModemStats) -> int:
+def insert_pull(conn, stats: ModemStats, own_ip: OwnIp) -> int:
     """Insert one pull and all associated stat rows. Returns the pull id."""
     with conn.cursor() as cur:
         cur.execute("INSERT INTO pull (pulled_at) VALUES (NOW()) RETURNING id, pulled_at;")
@@ -400,6 +406,11 @@ def insert_pull(conn, stats: ModemStats) -> int:
                 ),
             )
 
+        cur.execute(
+            "INSERT INTO own_ip (pull_id, ip) VALUES (%s, %s)",
+            (pull_id, own_ip.ip),
+        )
+
     conn.commit()
     return pull_id
 
@@ -410,7 +421,8 @@ def do_pull(conn, modem_cfg: ModemConfig) -> int:
     try:
         client.login()
         stats = client.get_stats(get_all_hnap_actions())
-        return insert_pull(conn, stats)
+        own_ip = get_own_ip()
+        return insert_pull(conn, stats, own_ip)
     finally:
         client.close()
 
