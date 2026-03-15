@@ -7,6 +7,7 @@ from typing import TypedDict, ClassVar, NewType
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import click
 import httpx
 
 EASTERN = ZoneInfo("America/New_York")
@@ -362,7 +363,7 @@ def parse_modem_response(data: dict) -> ModemStats:
     for key, cls in ModemStats.__annotations__.items():
         response_key = cls.HNAP_ACTION + "Response"
         if response_key in data:
-            stats[key] = cls.from_response(data[response_key])  # ty: ignore[invalid-key, unresolved-attribute]
+            stats[key] = cls.from_response(data[response_key])  # ty: ignore[invalid-key]
     return stats
 
 
@@ -374,6 +375,18 @@ def hex_hmac_md5(key: str, data: str) -> str:
 def change_text(s: str) -> str:
     """Toggle case of all characters in string."""
     return s.swapcase()
+
+
+@dataclass
+class RebootOptions:
+    set_eee_enable: bool = False
+    led_status: bool = True
+
+    def to_payload(self) -> dict:
+        return {
+            "SetEEEEnable": "1" if self.set_eee_enable else "0",
+            "LED_Status": "1" if self.led_status else "0",
+        }
 
 
 class HNAPClient:
@@ -480,83 +493,135 @@ class HNAPClient:
     def get_stats(self, actions: list[HNAPAction]) -> ModemStats:
         if len(actions) == 0:
             raise ValueError("Must specify at least one action to fetch stats")
-        payload = {"GetMultipleHNAPs": {action: "" for action in actions}}
-        response = self._make_request("GetMultipleHNAPs", payload)
+        get_multiple_hnap_action = "GetMultipleHNAPs"
+        payload = {get_multiple_hnap_action: {action: "" for action in actions}}
+        response = self._make_request(get_multiple_hnap_action, payload)
         hnap_responses = response
         if len(actions) > 1:
             hnap_responses = response["GetMultipleHNAPsResponse"]
         return parse_modem_response(hnap_responses)
+
+    def reboot(self, options: RebootOptions | None = None):
+        """Reboot the modem."""
+        set_arris_configuration_info = "SetArrisConfigurationInfo"
+        # POST /HNAP1/ with body {"SetArrisConfigurationInfo":{"Action":"reboot","SetEEEEnable":"0","LED_Status":"1"}}
+        payload = {set_arris_configuration_info: {"Action": "reboot"}}
+        if options:
+            payload[set_arris_configuration_info].update(options.to_payload())
+
+        # empty action, modem doesn't use one for this command
+        response = self._make_request(set_arris_configuration_info, payload)
+        result = response.get("SetArrisConfigurationInfoResponse", {}).get(
+            "SetArrisConfigurationInfoResult"
+        )
+        if result != "OK":
+            raise RuntimeError(f'Reboot failed, result not OK: "{result}"')
 
     def close(self):
         """Close the HTTP client."""
         self.client.close()
 
 
-def main():
-    import argparse
-    import os
-    import sys
-
-    all_actions = get_all_hnap_actions()
-
-    parser = argparse.ArgumentParser(description="Fetch Arris S33 modem statistics.")
-    parser.add_argument(
+def connection_options(f: click.decorators.FC) -> click.decorators.FC:
+    f = click.option(
         "-u",
         "--username",
-        default=os.environ.get("S33_MODEM_USERNAME") or "admin",
-        help="modem username. may also be set via environment variable S33_MODEM_USERNAME (default: admin)",
-    )
-    parser.add_argument(
+        default="admin",
+        show_default=True,
+        envvar="S33_MODEM_USERNAME",
+        help="modem username",
+    )(f)
+    f = click.option(
         "-p",
         "--password",
-        default=os.environ.get("S33_MODEM_PASSWORD"),
-        help="modem password or login key. may also be set via environment variable S33_MODEM_PASSWORD",
-    )
-    parser.add_argument(
+        required=True,
+        envvar="S33_MODEM_PASSWORD",
+        help="modem password or login key",
+    )(f)
+    f = click.option(
         "--host",
-        default=os.environ.get("S33_MODEM_HOST") or "192.168.0.1",
-        help="modem host or IP. may also be set via environment variable S33_MODEM_HOST (default: 192.168.0.1)",
+        default="192.168.0.1",
+        show_default=True,
+        envvar="S33_MODEM_HOST",
+        help="modem host or IP",
+    )(f)
+    return f
+
+
+def _login(username: str, password: str, host: str) -> HNAPClient:
+    client = HNAPClient(host, username, password)
+    click.echo(
+        f"Logging in to s33 modem {username}:{'*' * len(password)} @ {host}...",
+        err=True,
+        nl=False,
     )
-    parser.add_argument(
-        "actions",
-        nargs="*",
-        metavar="ACTION",
-        default=["all"],
-        help=("actions to fetch (default: all). valid: all, " + ", ".join(all_actions)),
-    )
+    client.login()
+    click.echo("✅", err=True)
+    return client
 
-    args = parser.parse_args()
 
-    if not args.password:
-        parser.error(
-            "missing required argument --password (or S33_MODEM_PASSWORD environment variable)"
-        )
+@click.group()
+def main() -> None:
+    """Arris S33 modem CLI."""
 
-    if any(a.lower() == "all" for a in args.actions):
+
+@main.command("stats")
+@connection_options
+@click.argument("actions", nargs=-1, metavar="ACTION")
+def stats_cmd(
+    username: str, password: str, host: str, actions: tuple[str, ...]
+) -> None:
+    """Fetch modem statistics. ACTION may be 'all' or a specific action name (default: all)."""
+    all_actions = get_all_hnap_actions()
+
+    selected: list[HNAPAction] = []
+    if not actions or any(a.lower() == "all" for a in actions):
         selected = all_actions
     else:
         valid = set(all_actions)
-        unknown = [a for a in args.actions if a not in valid]
+        unknown = [a for a in actions if a not in valid]
         if unknown:
-            parser.error(
+            raise click.UsageError(
                 "unknown action(s): "
                 + ", ".join(unknown)
                 + "\nvalid actions: all, "
                 + ", ".join(all_actions)
             )
-        selected = args.actions
+        selected = [HNAPAction(a) for a in actions]
 
-    client = HNAPClient(args.host, args.username, args.password)
+    client = _login(username, password, host)
+    click.echo(
+        f"Fetching stats for actions: {', '.join(selected)}...", err=True, nl=False
+    )
+    result = client.get_stats(selected)
+    click.echo("✅", err=True)
 
-    print(f"Logging in to s33 modem {args.username}:{'*' * len(args.password)} @ {args.host}...", file=sys.stderr, end="")
-    client.login()
-    print("✅", file=sys.stderr)
+    click.echo(json.dumps({k: asdict(v) for k, v in result.items()}, indent=2))  # ty: ignore[invalid-argument-type]
+    client.close()
 
-    print(f"Fetching stats for actions: {', '.join(selected)}...", file=sys.stderr, end="", flush=True)
-    stats = client.get_stats(selected)
-    print("✅", file=sys.stderr)
 
-    print(json.dumps({k: asdict(v) for k, v in stats.items()}, indent=2))  # ty: ignore[invalid-argument-type]
+@main.command("reboot")
+@connection_options
+@click.option(
+    "--set-eee-enable/--no-set-eee-enable",
+    default=False,
+    show_default=True,
+    help="enable Energy Efficient Ethernet",
+)
+@click.option(
+    "--led-status/--no-led-status",
+    default=True,
+    show_default=True,
+    help="LED status after reboot",
+)
+def reboot_cmd(
+    username: str, password: str, host: str, set_eee_enable: bool, led_status: bool
+) -> None:
+    """Reboot the modem."""
+    client = _login(username, password, host)
+    click.echo("Sending reboot command...", err=True, nl=False)
+    client.reboot(RebootOptions(set_eee_enable=set_eee_enable, led_status=led_status))
+    click.echo("✅", err=True)
     client.close()
 
 

@@ -2,45 +2,56 @@
 
 Tools for the S33 modem.
 
-1. A simple command-line tool to monitor and fetch stats from the modem using
-   its HNAP API.
+1. A simple command-line tool to interact with the modem using its HNAP API.
 
-   ```bash
-   $ s33 --password mypassword
-   {
-     "customer_status_startup_sequence": {
-       "downstream_frequency_hertz": 741000000,
-       "downstream_comment": "Locked",
-       "connectivity_status": "OK",
-       "connectivity_comment": "Operational",
-       "boot_status": "OK",
-       "boot_comment": "Operational",
-       "config_file_status": "OK",
-       "config_file_comment": "",
-       "security_status": "Enabled",
-       "security_comment": "BPI+"
-     },
-     "customer_status_connection_info": {
-       "system_uptime_seconds": 602183,
-       "system_time_unix": 1771475283,
-       "network_access": "Allowed"
-     },
-     "customer_status_downstream_channel_info": {
-       "channels": [
-         {
-           "channel_id": 31,
-           "lock_status": "Locked",
-           "modulation": "QAM256",
-           "frequency_hz": 741000000,
-           "power_dbmv": 11.0,
-           "snr_db": 37.0,
-           "corrected_count": 0,
-           "uncorrectable_count": 0
-           ...
-   ```
+   - Get modem stats:
+
+     ```bash
+     $ s33 stats --password mypassword
+     Logging in to s33 modem admin:*************** @ 192.168.0.1...✅
+     Fetching stats for actions: GetCustomerStatusStartupSequence, GetCustomerStatusConnectionInfo, GetCustomerStatusDownstreamChannelInfo, GetCustomerStatusUpstreamChannelInfo, GetCustomerStatusLog, GetCustomerStatusLogXXX, GetCustomerStatusSoftware, GetCustomerStatusXXX, GetArrisDeviceStatus, GetArrisRegisterInfo, GetArrisRegisterStatus, GetArrisConfigurationInfo, GetArrisXXX...✅
+     {
+       "customer_status_startup_sequence": {
+         "downstream_frequency_hertz": 741000000,
+         "downstream_comment": "Locked",
+         "connectivity_status": "OK",
+         "connectivity_comment": "Operational",
+         "boot_status": "OK",
+         "boot_comment": "Operational",
+         "config_file_status": "OK",
+         "config_file_comment": "",
+         "security_status": "Enabled",
+         "security_comment": "BPI+"
+       },
+       "customer_status_connection_info": {
+         "system_uptime_seconds": 602183,
+         "system_time_unix": 1771475283,
+         "network_access": "Allowed"
+       },
+       "customer_status_downstream_channel_info": {
+         "channels": [
+           {
+             "channel_id": 31,
+             "lock_status": "Locked",
+             "modulation": "QAM256",
+             "frequency_hz": 741000000,
+             "power_dbmv": 11.0,
+             "snr_db": 37.0,
+             "corrected_count": 0,
+             "uncorrectable_count": 0
+             ...
+     ```
+
+    - Reboot the modem:
+
+      ```bash
+      $ s33 reboot --password mypassword
+      Logging in to s33 modem admin:*************** @ 192.168.0.1...✅
+      Sending reboot command...✅
+      ```
 
 2. A background service to continuously read stats from the modem and insert
-them into a TimescaleDB database for long-term monitoring and analysis.
+   them into a TimescaleDB database for long-term monitoring and analysis.
 
    ```bash
    $ s33mon --modem-password mypassword --db-host localhost --db-user myuser --db-password mypassword
