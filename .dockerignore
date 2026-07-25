@@ -3,7 +3,12 @@
 __pycache__
 *.pyc
 *.egg-info
+build
+dist
+tests
 responses.json
 Makefile
-README.md
+CHANGELOG.md
 .python-version
+.pytest_cache
+.ruff_cache

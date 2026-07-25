@@ -20,23 +20,25 @@ ENV UV_LINK_MODE=copy
 # Ensure installed tools can be executed out of the box
 ENV UV_TOOL_BIN_DIR=/usr/local/bin
 
-# Install the project's dependencies using the lockfile and settings
+# Install the project's dependencies using the lockfile and settings.
+# The `monitor` extra pulls in psycopg2, which the poll loop needs.
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-dev
+    uv sync --locked --no-install-project --no-dev --extra monitor
 
 # Then, add the rest of the project source code and install it
 # Installing separately from its dependencies allows optimal layer caching
 COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+    uv sync --locked --no-dev --extra monitor
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Reset the entrypoint, don't invoke `uv`
-ENTRYPOINT ["s33mon"]
+# Configure with S33_* environment variables, or mount a config file and point
+# S33_CONFIG at it. Options may also be passed as CMD arguments.
+ENTRYPOINT ["s33", "monitor"]
 
 # Use the non-root user to run our application
 USER nonroot

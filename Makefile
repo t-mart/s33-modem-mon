@@ -1,4 +1,4 @@
-IMAGE := forgejo.bayleaf.wan.gothere.dev/tim/s33-modem-mon
+IMAGE := forgejo.bayleaf.gothere.dev/tim/s33-modem-mon
 
 .PHONY: push build
 
