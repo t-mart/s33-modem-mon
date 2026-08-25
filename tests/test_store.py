@@ -4,12 +4,15 @@ needing a database."""
 
 import re
 from dataclasses import fields
+from datetime import UTC, datetime
+from unittest.mock import Mock
 
 import pytest
 
 from s33mon.ip import OwnIp
 from s33mon.models import (
     DownstreamChannel,
+    LogEntry,
     ModemStats,
     UpstreamChannel,
 )
@@ -17,6 +20,8 @@ from s33mon.store.timescale import (
     CHANNEL_STATS,
     HYPERTABLES,
     SINGLE_ROW_STATS,
+    _insert_log_entries,
+    _migrate_log_entry,
     row_values,
     schema_sql,
 )
@@ -47,7 +52,22 @@ def tables() -> dict[str, list[str]]:
 
 def test_schema_parses(tables) -> None:
     assert tables["pull"] == ["id", "pulled_at"]
+    assert tables["log_entry"] == [
+        "first_observed_at",
+        "timestamp_at",
+        "level",
+        "message",
+    ]
     assert tables["own_ip"] == ["pull_id", "ip"]
+
+
+def test_new_log_entry_schema_has_deduplication_and_observation_index() -> None:
+    ddl = " ".join(schema_sql().split())
+    assert "PRIMARY KEY (timestamp_at, level, message)" in ddl
+    assert (
+        "CREATE INDEX IF NOT EXISTS log_entry_first_observed_at_idx "
+        "ON log_entry (first_observed_at DESC)"
+    ) in ddl
 
 
 @pytest.mark.parametrize("key", SINGLE_ROW_STATS)
@@ -75,6 +95,10 @@ def test_channel_stats_reference_real_stats_and_tables(tables) -> None:
 def test_hypertable_time_columns_exist(tables) -> None:
     for table, time_column in HYPERTABLES:
         assert time_column in tables[table]
+
+
+def test_log_entry_is_not_a_hypertable() -> None:
+    assert "log_entry" not in {table for table, _ in HYPERTABLES}
 
 
 def test_every_schema_table_is_written_by_something(tables) -> None:
@@ -108,3 +132,40 @@ def test_row_values_on_a_stat_without_extras() -> None:
         "pull_id": 1,
         "ip": "203.0.113.7",
     }
+
+
+def test_existing_log_entry_migration_keeps_historical_observation_times_null() -> None:
+    cur = Mock()
+    cur.fetchone.return_value = ("log_entry",)
+
+    _migrate_log_entry(cur)
+
+    statements = "\n".join(call.args[0] for call in cur.execute.call_args_list)
+    assert "ADD COLUMN IF NOT EXISTS first_observed_at TIMESTAMPTZ" in statements
+    assert "WHERE first_observed_at IS NOT NULL" in statements
+    assert "UPDATE" not in statements
+
+
+def test_log_insert_keeps_first_observation_and_modem_time(monkeypatch) -> None:
+    execute_values = Mock()
+    monkeypatch.setattr("psycopg2.extras.execute_values", execute_values)
+    cur = Mock()
+    pulled_at = datetime(2026, 8, 25, 12, 30, tzinfo=UTC)
+
+    _insert_log_entries(
+        cur,
+        [LogEntry(timestamp_unix=0, level=3, message="Invalid modem clock")],
+        pulled_at,
+    )
+
+    query = execute_values.call_args.args[1]
+    rows = execute_values.call_args.args[2]
+    assert "ON CONFLICT (timestamp_at, level, message) DO NOTHING" in query
+    assert rows == [
+        (
+            pulled_at,
+            datetime(1970, 1, 1, tzinfo=UTC),
+            3,
+            "Invalid modem clock",
+        )
+    ]

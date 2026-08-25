@@ -4,6 +4,8 @@
 
 ### Added
 
+- Log rows now store `first_observed_at` from the pull timestamp. Existing rows
+  keep null because their observation time is unknown.
 - A YAML config file at `$XDG_CONFIG_HOME/s33.yml` (override with `--config` or
   `S33_CONFIG`) holding modem, database, and monitor settings. Command-line
   flags win over environment variables, which win over the file. Every key is
@@ -16,6 +18,8 @@
 
 ### Changed
 
+- New databases now use a regular PostgreSQL `log_entry` table. Previously,
+  setup converted this table to a TimescaleDB hypertable.
 - Both commands now share one option set, so `--host`, `--username`, and
   `--password` work everywhere. The monitor's old `--modem-host`,
   `--modem-username`, and `--modem-password` spellings still work.

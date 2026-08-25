@@ -58,13 +58,17 @@ CREATE TABLE IF NOT EXISTS upstream_channel (
     PRIMARY KEY (pulled_at, pull_id, channel_id)
 );
 
--- No pull_id. Deduplicated by (timestamp_at, level, message).
--- Becomes a hypertable; unique index created after hypertable conversion.
+-- No pull_id. Deduplicated by the modem event time, level, and message.
 CREATE TABLE IF NOT EXISTS log_entry (
-    timestamp_at TIMESTAMPTZ NOT NULL,
-    level        INT         NOT NULL,
-    message      TEXT        NOT NULL
+    first_observed_at TIMESTAMPTZ NOT NULL,
+    timestamp_at      TIMESTAMPTZ NOT NULL,
+    level             INT         NOT NULL,
+    message           TEXT        NOT NULL,
+    PRIMARY KEY (timestamp_at, level, message)
 );
+
+CREATE INDEX IF NOT EXISTS log_entry_first_observed_at_idx
+    ON log_entry (first_observed_at DESC);
 
 CREATE TABLE IF NOT EXISTS customer_status_software (
     pull_id             BIGINT NOT NULL PRIMARY KEY,

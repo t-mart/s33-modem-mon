@@ -41,7 +41,6 @@ CHANNEL_STATS = (
 
 HYPERTABLES = (
     ("pull", "pulled_at"),
-    ("log_entry", "timestamp_at"),
     ("downstream_channel", "pulled_at"),
     ("upstream_channel", "pulled_at"),
 )
@@ -79,9 +78,27 @@ def connect(cfg: DBConfig):
         return _connect(cfg, cfg.name)
 
 
+def _migrate_log_entry(cur) -> None:
+    """Add observation time storage to an existing log table."""
+    cur.execute("SELECT to_regclass('log_entry');")
+    if cur.fetchone()[0] is None:
+        return
+
+    cur.execute("""
+        ALTER TABLE log_entry
+            ADD COLUMN IF NOT EXISTS first_observed_at TIMESTAMPTZ;
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS log_entry_first_observed_at_idx
+            ON log_entry (first_observed_at DESC)
+            WHERE first_observed_at IS NOT NULL;
+    """)
+
+
 def setup_schema(conn) -> None:
     """Create tables and TimescaleDB hypertables. Idempotent."""
     with conn.cursor() as cur:
+        _migrate_log_entry(cur)
         cur.execute(schema_sql())
 
         for table, time_column in HYPERTABLES:
@@ -89,13 +106,6 @@ def setup_schema(conn) -> None:
                 "SELECT create_hypertable(%s, %s, if_not_exists => TRUE);",
                 (table, time_column),
             )
-
-        # Log deduplication. Must include the partition column (timestamp_at).
-        # insert_pull's ON CONFLICT references this index.
-        cur.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS log_entry_dedup
-                ON log_entry (timestamp_at, level, message);
-        """)
 
     conn.commit()
     logger.info("Schema is ready.")
@@ -133,18 +143,19 @@ def _insert_rows(cur, table: str, objs: list, **extra: Any) -> None:
     )
 
 
-def _insert_log_entries(cur, entries: list) -> None:
+def _insert_log_entries(cur, entries: list, first_observed_at: datetime) -> None:
     if not entries:
         return
     psycopg2.extras.execute_values(
         cur,
         """
-        INSERT INTO log_entry (timestamp_at, level, message)
+        INSERT INTO log_entry (first_observed_at, timestamp_at, level, message)
         VALUES %s
         ON CONFLICT (timestamp_at, level, message) DO NOTHING
         """,
         [
             (
+                first_observed_at,
                 datetime.fromtimestamp(e.timestamp_unix, tz=UTC),
                 e.level,
                 e.message,
@@ -173,7 +184,7 @@ def insert_pull(conn, stats: ModemStats, own_ip: OwnIp | None = None) -> int:
                 )
 
         if log := stats.get("customer_status_log"):
-            _insert_log_entries(cur, log.entries)
+            _insert_log_entries(cur, log.entries, pulled_at)
 
         if own_ip:
             _insert_row(cur, "own_ip", own_ip, pull_id=pull_id)
