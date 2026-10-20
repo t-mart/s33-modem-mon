@@ -1,0 +1,2148 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The continuous time the modem has been powered on and running since its last reboot.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "dtdurations"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  p.pulled_at AS time,\n  ci.system_uptime_seconds AS \"Uptime\"\nFROM customer_status_connection_info ci\nJOIN pull p ON p.id = ci.pull_id\nORDER BY p.pulled_at DESC\nLIMIT 1;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Modem uptime",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The locked channel count divided by 32 expected downstream channels and 4 expected upstream channels.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 10,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at\n  FROM pull\n  ORDER BY pulled_at DESC\n  LIMIT 1\n)\nSELECT\n  p.pulled_at AS time,\n  'Downstream' AS metric,\n  LEAST(COUNT(*) FILTER (WHERE d.lock_status = 'Locked') / 32.0, 1) AS value\nFROM latest_pull p\nLEFT JOIN downstream_channel d\n  ON d.pull_id = p.id AND d.pulled_at = p.pulled_at\nGROUP BY p.pulled_at\nUNION ALL\nSELECT\n  p.pulled_at AS time,\n  'Upstream' AS metric,\n  LEAST(COUNT(*) FILTER (WHERE u.lock_status = 'Locked') / 4.0, 1) AS value\nFROM latest_pull p\nLEFT JOIN upstream_channel u\n  ON u.pull_id = p.id AND u.pulled_at = p.pulled_at\nGROUP BY p.pulled_at;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Channel bonding",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The elapsed time since the collector stored the newest modem sample.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "orange",
+                "value": 1500
+              },
+              {
+                "color": "red",
+                "value": 2100
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  now() AS time,\n  EXTRACT(EPOCH FROM now() - MAX(pulled_at)) AS \"Sample age\"\nFROM pull;",
+          "refId": "A"
+        }
+      ],
+      "title": "Telemetry age",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The newest pull must report six healthy modem status fields.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "Healthy"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "from": 1,
+                "result": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "Degraded"
+                },
+                "to": 100
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 21,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at\n  FROM pull\n  ORDER BY pulled_at DESC\n  LIMIT 1\n)\nSELECT\n  p.pulled_at AS time,\n  (ci.network_access IS DISTINCT FROM 'Allowed')::int AS \"Network access\",\n  (ss.connectivity_status IS DISTINCT FROM 'OK')::int AS \"Connectivity\",\n  (ss.boot_status IS DISTINCT FROM 'OK')::int AS \"Boot\",\n  (ss.config_file_status IS DISTINCT FROM 'OK')::int AS \"Configuration\",\n  (ss.security_status IS DISTINCT FROM 'Enabled')::int AS \"Security\",\n  (ds.internet_connection_status IS DISTINCT FROM 'Connected')::int AS \"Internet\"\nFROM latest_pull p\nLEFT JOIN customer_status_connection_info ci ON ci.pull_id = p.id\nLEFT JOIN customer_status_startup_sequence ss ON ss.pull_id = p.id\nLEFT JOIN arris_device_status ds ON ds.pull_id = p.id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Modem status",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 5,
+      "panels": [],
+      "title": "Downstream channels",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The modem could not repair these codewords. The total line preserves the highest sampled rate in each display bucket.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 400
+              }
+            ]
+          },
+          "unit": "suffix: codewords/min"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "All channels total"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [10, 10],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    GREATEST(\n      uncorrectable_count - LAG(uncorrectable_count) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      ),\n      0\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n), rates AS (\n  SELECT\n    time,\n    channel_id,\n    count_delta / NULLIF(seconds_delta, 0) * 60.0 AS rate\n  FROM deltas\n  WHERE time >= ($__timeFrom())::timestamptz AND seconds_delta > 0\n), totals AS (\n  SELECT time, SUM(rate) AS rate\n  FROM rates\n  GROUP BY time\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  MAX(rate) AS value\nFROM rates\nGROUP BY 1, channel_id\nUNION ALL\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'All channels total' AS metric,\n  MAX(rate) AS value\nFROM totals\nGROUP BY 1\nORDER BY 1, 2;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Uncorrectable codewords per minute",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The modem repaired these QAM codewords. The total line preserves the highest sampled rate in each display bucket.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "suffix: codewords/min"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "All QAM channels total"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [10, 10],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 16
+      },
+      "id": 13,
+      "interval": "15m",
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    GREATEST(\n      corrected_count - LAG(corrected_count) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      ),\n      0\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE modulation = 'QAM256'\n    AND pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n), rates AS (\n  SELECT\n    time,\n    channel_id,\n    count_delta / NULLIF(seconds_delta, 0) * 60.0 AS rate\n  FROM deltas\n  WHERE time >= ($__timeFrom())::timestamptz AND seconds_delta > 0\n), totals AS (\n  SELECT time, SUM(rate) AS rate\n  FROM rates\n  GROUP BY time\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  MAX(rate) AS value\nFROM rates\nGROUP BY 1, channel_id\nUNION ALL\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'All QAM channels total' AS metric,\n  MAX(rate) AS value\nFROM totals\nGROUP BY 1\nORDER BY 1, 2;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "QAM corrected codewords per minute",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "OFDM correction rates use a different scale from QAM rates. A separate panel keeps both patterns visible.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "suffix: codewords/min"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    GREATEST(\n      corrected_count - LAG(corrected_count) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      ),\n      0\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE modulation <> 'QAM256'\n    AND pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  MAX(count_delta / NULLIF(seconds_delta, 0) * 60.0) AS value\nFROM deltas\nWHERE time >= ($__timeFrom())::timestamptz AND seconds_delta > 0\nGROUP BY 1, channel_id\nORDER BY 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "OFDM corrected codewords per minute",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "QAM downstream power near 0 dBmV is best. Values outside -10 to 10 dBmV indicate a likely signal-path problem.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "orange",
+                "value": -10
+              },
+              {
+                "color": "green",
+                "value": -7
+              },
+              {
+                "color": "orange",
+                "value": 7
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "dBmV"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "QAM channel average"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [10, 10],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH bucketed AS (\n  SELECT\n    time_bucket('$resolution'::interval, pulled_at) AS time,\n    channel_id,\n    power_dbmv\n  FROM downstream_channel\n  WHERE modulation = 'QAM256' AND $__timeFilter(pulled_at)\n)\nSELECT\n  time,\n  'Channel ' || channel_id::text AS metric,\n  AVG(power_dbmv) AS value\nFROM bucketed\nGROUP BY time, channel_id\nUNION ALL\nSELECT\n  time,\n  'QAM channel average' AS metric,\n  AVG(power_dbmv) AS value\nFROM bucketed\nGROUP BY time\nORDER BY time, metric;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Downstream QAM power",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "QAM signal-to-noise ratio measures signal quality. Values below 33 dB indicate substantial noise and increased error risk.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "orange",
+                "value": 33
+              },
+              {
+                "color": "green",
+                "value": 35
+              }
+            ]
+          },
+          "unit": "dB"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "QAM channel minimum"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [10, 10],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH bucketed AS (\n  SELECT\n    time_bucket('$resolution'::interval, pulled_at) AS time,\n    channel_id,\n    snr_db\n  FROM downstream_channel\n  WHERE modulation = 'QAM256' AND $__timeFilter(pulled_at)\n)\nSELECT\n  time,\n  'Channel ' || channel_id::text AS metric,\n  MIN(snr_db) AS value\nFROM bucketed\nGROUP BY time, channel_id\nUNION ALL\nSELECT\n  time,\n  'QAM channel minimum' AS metric,\n  MIN(snr_db) AS value\nFROM bucketed\nGROUP BY time\nORDER BY time, metric;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Downstream QAM SNR",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Each line shows the last downstream frequency in each display bucket. Frequency changes usually follow provider maintenance.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "hertz"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time_bucket('$resolution'::interval, pulled_at) AS time,\n  'Channel ' || channel_id::text AS metric,\n  last(frequency_hz, pulled_at) AS value\nFROM downstream_channel\nWHERE $__timeFilter(pulled_at)\nGROUP BY 1, channel_id\nORDER BY 1, 2;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Downstream channel frequencies",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The latest downstream channel inventory and signal readings.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "hideFrom": {
+              "viz": false
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "id": 15,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  channel_id AS \"Channel ID\",\n  lock_status AS \"Lock status\",\n  modulation AS \"Modulation\",\n  frequency_hz / 1000000.0 AS \"Frequency (MHz)\",\n  power_dbmv AS \"Power (dBmV)\",\n  snr_db AS \"SNR (dB)\"\nFROM downstream_channel\nWHERE pulled_at = (SELECT MAX(pulled_at) FROM downstream_channel)\nORDER BY channel_id;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Latest downstream channels",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 56
+      },
+      "id": 6,
+      "panels": [],
+      "title": "Upstream channels",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Upstream power shows the transmit level that reaches the provider. Values from 38 to 48 dBmV are typical.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "orange",
+                "value": 35
+              },
+              {
+                "color": "green",
+                "value": 38
+              },
+              {
+                "color": "orange",
+                "value": 49
+              },
+              {
+                "color": "red",
+                "value": 52
+              }
+            ]
+          },
+          "unit": "dBmV"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Upstream channel average"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [10, 10],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH bucketed AS (\n  SELECT\n    time_bucket('$resolution'::interval, pulled_at) AS time,\n    channel_id,\n    power_dbmv\n  FROM upstream_channel\n  WHERE $__timeFilter(pulled_at)\n)\nSELECT\n  time,\n  'Channel ' || channel_id::text AS metric,\n  AVG(power_dbmv) AS value\nFROM bucketed\nGROUP BY time, channel_id\nUNION ALL\nSELECT\n  time,\n  'Upstream channel average' AS metric,\n  AVG(power_dbmv) AS value\nFROM bucketed\nGROUP BY time\nORDER BY time, metric;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Upstream power",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Each line shows the last upstream channel width in each display bucket. Width changes can indicate provider channel adjustments.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "hertz"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 64
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time_bucket('$resolution'::interval, pulled_at) AS time,\n  'Channel ' || channel_id::text AS metric,\n  last(width_hz, pulled_at) AS value\nFROM upstream_channel\nWHERE $__timeFilter(pulled_at)\nGROUP BY 1, channel_id\nORDER BY 1, 2;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Upstream channel width",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "hideFrom": {
+              "viz": false
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "id": 16,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  channel_id AS \"Channel ID\",\n  lock_status AS \"Lock status\",\n  channel_type AS \"Channel type\",\n  width_hz / 1000000.0 AS \"Width (MHz)\",\n  frequency_hz / 1000000.0 AS \"Frequency (MHz)\",\n  power_dbmv AS \"Power (dBmV)\"\nFROM upstream_channel\nWHERE pulled_at = (SELECT MAX(pulled_at) FROM upstream_channel)\nORDER BY channel_id;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "description": "The latest upstream channel inventory and transmit power readings.",
+      "title": "Latest upstream channels",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The minimum present and locked channel counts in each display bucket. Expected lines show the normal channel inventory.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/expected/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [10, 10],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 78
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH pulls AS (\n  SELECT id, pulled_at\n  FROM pull\n  WHERE $__timeFilter(pulled_at)\n), downstream_counts AS (\n  SELECT\n    p.id,\n    p.pulled_at,\n    COUNT(d.channel_id) AS present_count,\n    COUNT(d.channel_id) FILTER (WHERE d.lock_status = 'Locked') AS locked_count\n  FROM pulls p\n  LEFT JOIN downstream_channel d\n    ON d.pull_id = p.id AND d.pulled_at = p.pulled_at\n  GROUP BY p.id, p.pulled_at\n), upstream_counts AS (\n  SELECT\n    p.id,\n    p.pulled_at,\n    COUNT(u.channel_id) AS present_count,\n    COUNT(u.channel_id) FILTER (WHERE u.lock_status = 'Locked') AS locked_count\n  FROM pulls p\n  LEFT JOIN upstream_channel u\n    ON u.pull_id = p.id AND u.pulled_at = p.pulled_at\n  GROUP BY p.id, p.pulled_at\n), counts AS (\n  SELECT\n    d.pulled_at,\n    d.present_count AS downstream_present,\n    d.locked_count AS downstream_locked,\n    u.present_count AS upstream_present,\n    u.locked_count AS upstream_locked\n  FROM downstream_counts d\n  JOIN upstream_counts u USING (id, pulled_at)\n)\nSELECT time_bucket('$resolution'::interval, pulled_at) AS time, 'Downstream present' AS metric, MIN(downstream_present) AS value FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Downstream locked', MIN(downstream_locked) FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Downstream expected', 32 FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Upstream present', MIN(upstream_present) FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Upstream locked', MIN(upstream_locked) FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Upstream expected', 4 FROM counts GROUP BY 1\nORDER BY 1, 2;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Channel bonding history",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "hideFrom": {
+              "viz": false
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Level"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Observed"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 195
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modem time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 195
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 86
+      },
+      "id": 12,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Observed"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  first_observed_at AS \"Observed\",\n  timestamp_at AS \"Modem time\",\n  CASE level\n    WHEN 0 THEN 'Emergency'\n    WHEN 1 THEN 'Alert'\n    WHEN 2 THEN 'Critical'\n    WHEN 3 THEN 'Error'\n    WHEN 4 THEN 'Warning'\n    WHEN 5 THEN 'Notice'\n    WHEN 6 THEN 'Informational'\n    WHEN 7 THEN 'Debug'\n    ELSE level::text\n  END AS \"Level\",\n  message AS \"Message\"\nFROM log_entry\nWHERE $__timeFilter(first_observed_at)\n  AND message NOT LIKE 'Successful LAN WebGUI login from %'\nORDER BY first_observed_at DESC\nLIMIT 100;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "description": "The newest modem events by collection time. The query also shows modem time and excludes routine collector login messages.",
+      "title": "Modem events",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "The public IP address reported by each modem pull in the selected range. Colors follow each IP's first observation in retained history and repeat after ten distinct IPs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 86
+      },
+      "id": 23,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "always",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  p.pulled_at AS time,\n  'Public IP' AS metric,\n  oi.ip AS state\nFROM own_ip oi\nJOIN pull p ON p.id = oi.pull_id\nWHERE $__timeFilter(p.pulled_at)\nORDER BY p.pulled_at;",
+          "refId": "A"
+        },
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH addresses AS (\n  SELECT\n    oi.ip,\n    row_number() OVER (ORDER BY min(p.pulled_at), oi.ip) - 1 AS color_index\n  FROM own_ip oi\n  JOIN pull p ON p.id = oi.pull_id\n  WHERE oi.ip IS NOT NULL\n  GROUP BY oi.ip\n), palette AS (\n  SELECT ARRAY[\n    '#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F',\n    '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC'\n  ] AS colors\n)\nSELECT\n  ip AS \"Value\",\n  ip AS \"Text\",\n  colors[(color_index % cardinality(colors) + 1)::integer] AS \"Color\"\nFROM addresses\nCROSS JOIN palette\nORDER BY color_index;",
+          "refId": "B"
+        }
+      ],
+      "title": "Public IP history",
+      "transformations": [
+        {
+          "id": "configFromData",
+          "options": {
+            "applyTo": {
+              "id": "byName",
+              "options": "state"
+            },
+            "configRefId": "B",
+            "mappings": [
+              {
+                "fieldName": "Value",
+                "handlerKey": "mappings.value",
+                "reducerId": "allValues"
+              },
+              {
+                "fieldName": "Text",
+                "handlerKey": "mappings.text",
+                "reducerId": "allValues"
+              },
+              {
+                "fieldName": "Color",
+                "handlerKey": "mappings.color",
+                "reducerId": "allValues"
+              }
+            ]
+          }
+        },
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": ["metric"],
+            "keepFields": false,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        }
+      ],
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "QAM256": {
+                  "color": "orange",
+                  "index": 0
+                },
+                "OFDM PLC": {
+                  "color": "blue",
+                  "index": 1
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 94
+      },
+      "id": 19,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  pulled_at AS time,\n  'Channel ' || channel_id::text AS metric,\n  modulation AS state\nFROM downstream_channel\nWHERE $__timeFilter(pulled_at)\nORDER BY time, metric;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "description": "The modulation reported by each downstream channel. A state change can identify a provider channel reconfiguration.",
+      "title": "Downstream modulation",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": ["metric"],
+            "keepFields": false,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        }
+      ],
+      "type": "state-timeline"
+    }
+  ],
+  "preload": false,
+  "refresh": "5m",
+  "schemaVersion": 42,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "auto": true,
+        "auto_count": 100,
+        "auto_min": "15m",
+        "current": {
+          "text": "1h",
+          "value": "1h"
+        },
+        "description": "",
+        "label": "Resolution",
+        "name": "resolution",
+        "options": [
+          {
+            "selected": false,
+            "text": "15m",
+            "value": "15m"
+          },
+          {
+            "selected": false,
+            "text": "30m",
+            "value": "30m"
+          },
+          {
+            "selected": true,
+            "text": "1h",
+            "value": "1h"
+          },
+          {
+            "selected": false,
+            "text": "6h",
+            "value": "6h"
+          },
+          {
+            "selected": false,
+            "text": "12h",
+            "value": "12h"
+          },
+          {
+            "selected": false,
+            "text": "1d",
+            "value": "1d"
+          },
+          {
+            "selected": false,
+            "text": "7d",
+            "value": "7d"
+          },
+          {
+            "selected": false,
+            "text": "14d",
+            "value": "14d"
+          },
+          {
+            "selected": false,
+            "text": "30d",
+            "value": "30d"
+          }
+        ],
+        "query": "15m,30m,1h,3h,6h,12h,1d,7d,14d,30d",
+        "refresh": 2,
+        "type": "interval"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "S33 Modem",
+  "uid": "cssf7x5",
+  "version": 30,
+  "weekStart": ""
+}
