@@ -133,17 +133,23 @@ The `modem_event` view classifies stored log messages without changes to their t
 The monitor creates or updates this view at startup.
 
 Import `dashboards/s33-modem.json` after the monitor updates the schema.
-The dashboard adds event counts, link-event annotations, and the modem clock offset.
-Previously, modem events appeared only in a text table.
+The dashboard separates modem events, public IP history, clock drift, and channel data into sections.
+The header includes the current public IP and clock drift.
 
 Event counts use the first observation time, not the modem event time.
-Each display bucket counts newly observed records by event type.
+Each display bucket counts records first observed within that bucket, by event type.
 Buckets without pulls remain gaps. Historical records without observation times do not contribute to these counts.
 Log limits and identical records can hide events, so counts do not establish outage duration.
 
 The event table retains both timestamps and includes unrecognized messages as `other`.
-The clock offset compares collection time with modem time after time-zone conversion.
+Clock drift compares collection time with modem time after time-zone conversion.
+Values use minutes with two decimals, instead of whole hours.
 Positive values mean that the modem clock trails collection time. The collector still interprets modem timestamps as Eastern time.
+
+Codeword rates use stacked bars with a duration-weighted average for each channel, instead of lines with separate totals.
+Counter decreases do not contribute to these rates.
+Channel bonding history shows missing and unlocked channel counts on separate timeline rows, instead of overlapping expected, present, and locked lines.
+Zero means complete. Negative missing counts indicate extra channels. Empty display buckets remain gaps.
 
 ## Layout
 
@@ -172,6 +178,9 @@ dataclass, and `tests/test_store.py` checks that the two stay in sync.
 uv sync --all-extras
 uv run ruff format . ; uv run ruff check . ; uv run ty check ; uv run pytest
 ```
+
+Set `S33_TEST_DSN` to a TimescaleDB connection string to include the dashboard SQL tests.
+These tests use read-only transactions and synthetic rows. Without this variable, pytest skips the dashboard SQL tests.
 
 ## Docker
 

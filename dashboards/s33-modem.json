@@ -12,28 +12,6 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
-      },
-      {
-        "datasource": {
-          "type": "grafana-postgresql-datasource",
-          "uid": "bfdoxbtd5wveoc"
-        },
-        "enable": true,
-        "hide": false,
-        "iconColor": "#F2495C",
-        "name": "Modem link events (observed)",
-        "target": {
-          "dataset": "s33mon",
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "bfdoxbtd5wveoc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  first_observed_at AS time,\n  'Newly observed: ' || string_agg(event_type || ': ' || count::text, ', ' ORDER BY event_type) AS text,\n  string_agg(event_type, ',' ORDER BY event_type) AS tags\nFROM (\n  SELECT first_observed_at, event_type, COUNT(*) AS count\n  FROM modem_event\n  WHERE $__timeFilter(first_observed_at)\n    AND event_type IN ('sync_failure', 't4_timeout')\n  GROUP BY first_observed_at, event_type\n) events\nGROUP BY first_observed_at\nORDER BY first_observed_at;",
-          "refId": "A"
-        }
       }
     ]
   },
@@ -69,8 +47,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
-        "w": 6,
+        "h": 6,
+        "w": 4,
         "x": 0,
         "y": 0
       },
@@ -158,9 +136,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
-        "w": 6,
-        "x": 6,
+        "h": 6,
+        "w": 4,
+        "x": 4,
         "y": 0
       },
       "id": 10,
@@ -246,9 +224,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
-        "w": 6,
-        "x": 12,
+        "h": 6,
+        "w": 4,
+        "x": 8,
         "y": 0
       },
       "id": 20,
@@ -339,9 +317,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
-        "w": 6,
-        "x": 18,
+        "h": 6,
+        "w": 4,
+        "x": 12,
         "y": 0
       },
       "id": 21,
@@ -384,7 +362,143 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "Counts use first observation time. Buckets without pulls remain gaps. Log limits and identical records can hide events.",
+      "description": "The public IP from the newest pull. A failed lookup displays Unknown.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "string",
+          "noValue": "Unknown",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "id": 26,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "/Public IP/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at FROM pull ORDER BY pulled_at DESC LIMIT 1\n)\nSELECT p.pulled_at AS time, oi.ip AS \"Public IP\"\nFROM latest_pull p\nLEFT JOIN own_ip oi ON oi.pull_id = p.id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Current public IP",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Clock drift from the newest pull, in minutes. Positive values mean that the modem clock trails collection time.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: min",
+          "decimals": 2,
+          "noValue": "Unknown",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 27,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at FROM pull ORDER BY pulled_at DESC LIMIT 1\n)\nSELECT\n  p.pulled_at AS time,\n  (EXTRACT(EPOCH FROM p.pulled_at) - ci.system_time_unix) / 60.0 AS \"Clock drift\"\nFROM latest_pull p\nLEFT JOIN customer_status_connection_info ci ON ci.pull_id = p.id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Current clock drift",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 5,
+      "panels": [],
+      "title": "Downstream channels",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Each segment shows a channel rate, weighted by sample duration. Counter decreases are excluded. The stack combines channel rates without a separate total.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -434,9 +548,9 @@
               }
             ]
           },
-          "unit": "short",
-          "decimals": 0,
-          "min": 0
+          "unit": "suffix: codewords/min",
+          "min": 0,
+          "decimals": 2
         },
         "overrides": []
       },
@@ -445,136 +559,6 @@
         "w": 24,
         "x": 0,
         "y": 7
-      },
-      "id": 24,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.3",
-      "targets": [
-        {
-          "dataset": "s33mon",
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "bfdoxbtd5wveoc"
-          },
-          "editorMode": "code",
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    time_bucket('$resolution'::interval, ($__timeFrom())::timestamptz),\n    time_bucket('$resolution'::interval, ($__timeTo())::timestamptz),\n    '$resolution'::interval\n  ) AS time\n), types(event_type, label) AS (\n  VALUES\n    ('sync_failure', 'Sync failures'),\n    ('t3_timeout', 'T3 timeouts'),\n    ('t4_timeout', 'T4 timeouts'),\n    ('mdd_timeout', 'MDD timeouts'),\n    ('dhcp_failure', 'DHCP failures'),\n    ('dhcp_warning', 'DHCP warnings'),\n    ('profile_change', 'Profile changes'),\n    ('other', 'Other events')\n), observations AS (\n  SELECT DISTINCT time_bucket('$resolution'::interval, pulled_at) AS time\n  FROM pull\n  WHERE $__timeFilter(pulled_at)\n), events AS (\n  SELECT\n    time_bucket('$resolution'::interval, first_observed_at) AS time,\n    event_type,\n    COUNT(*) AS count\n  FROM modem_event\n  WHERE $__timeFilter(first_observed_at) AND event_type <> 'collector_login'\n  GROUP BY 1, 2\n)\nSELECT\n  b.time,\n  t.label AS metric,\n  CASE WHEN o.time IS NOT NULL OR e.count IS NOT NULL THEN COALESCE(e.count, 0) END AS value\nFROM buckets b\nCROSS JOIN types t\nLEFT JOIN observations o ON o.time = b.time\nLEFT JOIN events e ON e.time = b.time AND e.event_type = t.event_type\nORDER BY b.time, t.label;",
-          "refId": "A"
-        }
-      ],
-      "title": "Newly observed modem events",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 15
-      },
-      "id": 5,
-      "panels": [],
-      "title": "Downstream channels",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "bfdoxbtd5wveoc"
-      },
-      "description": "The modem could not repair these codewords. The total line preserves the highest sampled rate in each display bucket.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 3,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 400
-              }
-            ]
-          },
-          "unit": "suffix: codewords/min"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "All channels total"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [10, 10],
-                  "fill": "dash"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 16
       },
       "id": 14,
       "options": {
@@ -601,25 +585,8 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    GREATEST(\n      uncorrectable_count - LAG(uncorrectable_count) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      ),\n      0\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n), rates AS (\n  SELECT\n    time,\n    channel_id,\n    count_delta / NULLIF(seconds_delta, 0) * 60.0 AS rate\n  FROM deltas\n  WHERE time >= ($__timeFrom())::timestamptz AND seconds_delta > 0\n), totals AS (\n  SELECT time, SUM(rate) AS rate\n  FROM rates\n  GROUP BY time\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  MAX(rate) AS value\nFROM rates\nGROUP BY 1, channel_id\nUNION ALL\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'All channels total' AS metric,\n  MAX(rate) AS value\nFROM totals\nGROUP BY 1\nORDER BY 1, 2;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    uncorrectable_count - LAG(uncorrectable_count) OVER (\n      PARTITION BY channel_id ORDER BY pulled_at\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  SUM(count_delta) / NULLIF(SUM(seconds_delta), 0) * 60.0 AS value\nFROM deltas\nWHERE time >= ($__timeFrom())::timestamptz\n  AND seconds_delta > 0 AND count_delta >= 0\nGROUP BY 1, channel_id\nORDER BY 1, 2;",
+          "refId": "A"
         }
       ],
       "title": "Uncorrectable codewords per minute",
@@ -630,7 +597,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "The modem repaired these QAM codewords. The total line preserves the highest sampled rate in each display bucket.",
+      "description": "Each segment shows a channel rate, weighted by sample duration. Counter decreases are excluded. The stack combines channel rates without a separate total.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -644,8 +611,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 85,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -654,20 +621,20 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 3,
+            "lineWidth": 0,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
-              "mode": "line"
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -675,35 +642,22 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
-          "unit": "suffix: codewords/min"
+          "unit": "suffix: codewords/min",
+          "min": 0,
+          "decimals": 2
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "All QAM channels total"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [10, 10],
-                  "fill": "dash"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 16,
         "x": 0,
-        "y": 24
+        "y": 15
       },
       "id": 13,
       "interval": "5m",
@@ -731,25 +685,8 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    GREATEST(\n      corrected_count - LAG(corrected_count) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      ),\n      0\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE modulation = 'QAM256'\n    AND pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n), rates AS (\n  SELECT\n    time,\n    channel_id,\n    count_delta / NULLIF(seconds_delta, 0) * 60.0 AS rate\n  FROM deltas\n  WHERE time >= ($__timeFrom())::timestamptz AND seconds_delta > 0\n), totals AS (\n  SELECT time, SUM(rate) AS rate\n  FROM rates\n  GROUP BY time\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  MAX(rate) AS value\nFROM rates\nGROUP BY 1, channel_id\nUNION ALL\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'All QAM channels total' AS metric,\n  MAX(rate) AS value\nFROM totals\nGROUP BY 1\nORDER BY 1, 2;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    corrected_count - LAG(corrected_count) OVER (\n      PARTITION BY channel_id ORDER BY pulled_at\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE modulation = 'QAM256' AND pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  SUM(count_delta) / NULLIF(SUM(seconds_delta), 0) * 60.0 AS value\nFROM deltas\nWHERE time >= ($__timeFrom())::timestamptz\n  AND seconds_delta > 0 AND count_delta >= 0\nGROUP BY 1, channel_id\nORDER BY 1, 2;",
+          "refId": "A"
         }
       ],
       "title": "QAM corrected codewords per minute",
@@ -760,7 +697,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "OFDM correction rates use a different scale from QAM rates. A separate panel keeps both patterns visible.",
+      "description": "Each segment shows a channel rate, weighted by sample duration. Counter decreases are excluded. The stack combines channel rates without a separate total.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -774,8 +711,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 85,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -784,19 +721,19 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 3,
+            "lineWidth": 0,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
-              "mode": "line"
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -804,11 +741,14 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
-          "unit": "suffix: codewords/min"
+          "unit": "suffix: codewords/min",
+          "min": 0,
+          "decimals": 2
         },
         "overrides": []
       },
@@ -816,7 +756,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 24
+        "y": 15
       },
       "id": 22,
       "options": {
@@ -843,7 +783,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    GREATEST(\n      corrected_count - LAG(corrected_count) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      ),\n      0\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE modulation <> 'QAM256'\n    AND pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  MAX(count_delta / NULLIF(seconds_delta, 0) * 60.0) AS value\nFROM deltas\nWHERE time >= ($__timeFrom())::timestamptz AND seconds_delta > 0\nGROUP BY 1, channel_id\nORDER BY 1, 2;",
+          "rawSql": "WITH deltas AS (\n  SELECT\n    pulled_at AS time,\n    channel_id,\n    corrected_count - LAG(corrected_count) OVER (\n      PARTITION BY channel_id ORDER BY pulled_at\n    ) AS count_delta,\n    EXTRACT(EPOCH FROM (\n      pulled_at - LAG(pulled_at) OVER (\n        PARTITION BY channel_id ORDER BY pulled_at\n      )\n    )) AS seconds_delta\n  FROM downstream_channel\n  WHERE modulation <> 'QAM256' AND pulled_at BETWEEN ($__timeFrom())::timestamptz - interval '30 minutes' AND ($__timeTo())::timestamptz\n)\nSELECT\n  time_bucket('$resolution'::interval, time) AS time,\n  'Channel ' || channel_id::text AS metric,\n  SUM(count_delta) / NULLIF(SUM(seconds_delta), 0) * 60.0 AS value\nFROM deltas\nWHERE time >= ($__timeFrom())::timestamptz\n  AND seconds_delta > 0 AND count_delta >= 0\nGROUP BY 1, channel_id\nORDER BY 1, 2;",
           "refId": "A"
         }
       ],
@@ -944,7 +884,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 23
       },
       "id": 1,
       "options": {
@@ -1084,7 +1024,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 31
       },
       "id": 2,
       "options": {
@@ -1194,10 +1134,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 39
       },
       "id": 18,
       "options": {
@@ -1253,26 +1193,38 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "The latest downstream channel inventory and signal readings.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "footer": {
-              "reducers": []
-            },
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
             "hideFrom": {
+              "legend": false,
+              "tooltip": false,
               "viz": false
             },
-            "inspect": false
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "QAM256": {
+                  "color": "orange",
+                  "index": 0
+                },
+                "OFDM PLC": {
+                  "color": "blue",
+                  "index": 1
+                }
+              },
+              "type": "value"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1285,16 +1237,27 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 12,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 47
       },
-      "id": 15,
+      "id": 19,
       "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": []
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
       },
       "pluginVersion": "12.3.3",
       "targets": [
@@ -1307,7 +1270,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  channel_id AS \"Channel ID\",\n  lock_status AS \"Lock status\",\n  modulation AS \"Modulation\",\n  frequency_hz / 1000000.0 AS \"Frequency (MHz)\",\n  power_dbmv AS \"Power (dBmV)\",\n  snr_db AS \"SNR (dB)\"\nFROM downstream_channel\nWHERE pulled_at = (SELECT MAX(pulled_at) FROM downstream_channel)\nORDER BY channel_id;",
+          "rawSql": "SELECT\n  pulled_at AS time,\n  'Channel ' || channel_id::text AS metric,\n  modulation AS state\nFROM downstream_channel\nWHERE $__timeFilter(pulled_at)\nORDER BY time, metric;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1328,8 +1291,21 @@
           }
         }
       ],
-      "title": "Latest downstream channels",
-      "type": "table"
+      "description": "The modulation reported by each downstream channel. A state change can identify a provider channel reconfiguration.",
+      "title": "Downstream modulation",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": ["metric"],
+            "keepFields": false,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        }
+      ],
+      "type": "state-timeline"
     },
     {
       "collapsed": false,
@@ -1337,7 +1313,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 59
       },
       "id": 6,
       "panels": [],
@@ -1435,10 +1411,10 @@
         ]
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 60
       },
       "id": 7,
       "options": {
@@ -1548,10 +1524,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 68
       },
       "id": 8,
       "options": {
@@ -1603,34 +1579,61 @@
       "type": "timeseries"
     },
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
+      "id": 28,
+      "panels": [],
+      "title": "Channel bonding",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
       "fieldConfig": {
         "defaults": {
+          "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "footer": {
-              "reducers": []
-            },
-            "hideFrom": {
-              "viz": false
-            },
-            "inspect": false
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "spanNulls": false
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Complete",
+                  "color": "green",
+                  "index": 0
+                }
+              }
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "purple",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
               }
             ]
           }
@@ -1638,16 +1641,27 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 79
+        "y": 77
       },
-      "id": 16,
+      "id": 17,
       "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": []
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "12.3.3",
       "targets": [
@@ -1660,37 +1674,45 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  channel_id AS \"Channel ID\",\n  lock_status AS \"Lock status\",\n  channel_type AS \"Channel type\",\n  width_hz / 1000000.0 AS \"Width (MHz)\",\n  frequency_hz / 1000000.0 AS \"Frequency (MHz)\",\n  power_dbmv AS \"Power (dBmV)\"\nFROM upstream_channel\nWHERE pulled_at = (SELECT MAX(pulled_at) FROM upstream_channel)\nORDER BY channel_id;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
+          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    time_bucket('$resolution'::interval, ($__timeFrom())::timestamptz),\n    time_bucket('$resolution'::interval, ($__timeTo())::timestamptz),\n    '$resolution'::interval\n  ) AS time\n), pulls AS (\n  SELECT id, pulled_at FROM pull WHERE $__timeFilter(pulled_at)\n), downstream_counts AS (\n  SELECT p.pulled_at,\n    COUNT(d.channel_id) AS present,\n    COUNT(d.channel_id) FILTER (WHERE d.lock_status = 'Locked') AS locked\n  FROM pulls p\n  LEFT JOIN downstream_channel d ON d.pull_id = p.id AND d.pulled_at = p.pulled_at\n  GROUP BY p.pulled_at\n), upstream_counts AS (\n  SELECT p.pulled_at,\n    COUNT(u.channel_id) AS present,\n    COUNT(u.channel_id) FILTER (WHERE u.lock_status = 'Locked') AS locked\n  FROM pulls p\n  LEFT JOIN upstream_channel u ON u.pull_id = p.id AND u.pulled_at = p.pulled_at\n  GROUP BY p.pulled_at\n), deficits AS (\n  SELECT pulled_at, 'Downstream missing' AS metric, 32 - present AS value FROM downstream_counts\n  UNION ALL\n  SELECT pulled_at, 'Downstream unlocked', present - locked FROM downstream_counts\n  UNION ALL\n  SELECT pulled_at, 'Upstream missing', 4 - present FROM upstream_counts\n  UNION ALL\n  SELECT pulled_at, 'Upstream unlocked', present - locked FROM upstream_counts\n), worst AS (\n  SELECT time_bucket('$resolution'::interval, pulled_at) AS time, metric,\n    (array_agg(value ORDER BY abs(value) DESC, pulled_at DESC))[1] AS value\n  FROM deficits GROUP BY 1, 2\n), metrics(metric) AS (\n  VALUES ('Downstream missing'), ('Downstream unlocked'), ('Upstream missing'), ('Upstream unlocked')\n)\nSELECT b.time, m.metric, w.value\nFROM buckets b CROSS JOIN metrics m\nLEFT JOIN worst w ON w.time = b.time AND w.metric = m.metric\nORDER BY b.time, m.metric;",
+          "refId": "A"
+        }
+      ],
+      "description": "Zero means complete. Missing counts equal expected minus present; negative values mean extra channels. Unlocked counts equal present minus locked. Expected: 32 downstream, 4 upstream. Each bucket preserves the largest absolute deficit; empty buckets remain gaps.",
+      "title": "Channel bonding deficits",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": ["metric"],
+            "keepFields": false,
+            "naming": {
+              "asLabels": true
+            }
           }
         }
       ],
-      "description": "The latest upstream channel inventory and transmit power readings.",
-      "title": "Latest upstream channels",
-      "type": "table"
+      "type": "state-timeline"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      },
+      "id": 29,
+      "panels": [],
+      "title": "Modem events",
+      "type": "row"
     },
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "The minimum present and locked channel counts in each display bucket. Expected lines show the normal channel inventory.",
+      "description": "Counts use first observation time. Buckets without pulls remain gaps. Log limits and identical records can hide events.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1704,8 +1726,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 85,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -1713,51 +1735,38 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 3,
+            "lineInterpolation": "linear",
+            "lineWidth": 0,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
-              "mode": "line"
+              "mode": "off"
             }
           },
-          "decimals": 0,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
-          }
+          },
+          "unit": "short",
+          "decimals": 0,
+          "min": 0
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "/expected/"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [10, 10],
-                  "fill": "dash"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -1765,7 +1774,7 @@
         "x": 0,
         "y": 86
       },
-      "id": 17,
+      "id": 24,
       "options": {
         "legend": {
           "calcs": [],
@@ -1790,28 +1799,11 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "WITH pulls AS (\n  SELECT id, pulled_at\n  FROM pull\n  WHERE $__timeFilter(pulled_at)\n), downstream_counts AS (\n  SELECT\n    p.id,\n    p.pulled_at,\n    COUNT(d.channel_id) AS present_count,\n    COUNT(d.channel_id) FILTER (WHERE d.lock_status = 'Locked') AS locked_count\n  FROM pulls p\n  LEFT JOIN downstream_channel d\n    ON d.pull_id = p.id AND d.pulled_at = p.pulled_at\n  GROUP BY p.id, p.pulled_at\n), upstream_counts AS (\n  SELECT\n    p.id,\n    p.pulled_at,\n    COUNT(u.channel_id) AS present_count,\n    COUNT(u.channel_id) FILTER (WHERE u.lock_status = 'Locked') AS locked_count\n  FROM pulls p\n  LEFT JOIN upstream_channel u\n    ON u.pull_id = p.id AND u.pulled_at = p.pulled_at\n  GROUP BY p.id, p.pulled_at\n), counts AS (\n  SELECT\n    d.pulled_at,\n    d.present_count AS downstream_present,\n    d.locked_count AS downstream_locked,\n    u.present_count AS upstream_present,\n    u.locked_count AS upstream_locked\n  FROM downstream_counts d\n  JOIN upstream_counts u USING (id, pulled_at)\n)\nSELECT time_bucket('$resolution'::interval, pulled_at) AS time, 'Downstream present' AS metric, MIN(downstream_present) AS value FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Downstream locked', MIN(downstream_locked) FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Downstream expected', 32 FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Upstream present', MIN(upstream_present) FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Upstream locked', MIN(upstream_locked) FROM counts GROUP BY 1\nUNION ALL\nSELECT time_bucket('$resolution'::interval, pulled_at), 'Upstream expected', 4 FROM counts GROUP BY 1\nORDER BY 1, 2;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    time_bucket('$resolution'::interval, ($__timeFrom())::timestamptz),\n    time_bucket('$resolution'::interval, ($__timeTo())::timestamptz),\n    '$resolution'::interval\n  ) AS time\n), types(event_type, label) AS (\n  VALUES\n    ('sync_failure', 'Sync failures'),\n    ('t3_timeout', 'T3 timeouts'),\n    ('t4_timeout', 'T4 timeouts'),\n    ('mdd_timeout', 'MDD timeouts'),\n    ('dhcp_failure', 'DHCP failures'),\n    ('dhcp_warning', 'DHCP warnings'),\n    ('profile_change', 'Profile changes'),\n    ('other', 'Other events')\n), observations AS (\n  SELECT DISTINCT time_bucket('$resolution'::interval, pulled_at) AS time\n  FROM pull\n  WHERE $__timeFilter(pulled_at)\n), events AS (\n  SELECT\n    time_bucket('$resolution'::interval, first_observed_at) AS time,\n    event_type,\n    COUNT(*) AS count\n  FROM modem_event\n  WHERE $__timeFilter(first_observed_at) AND event_type <> 'collector_login'\n  GROUP BY 1, 2\n)\nSELECT\n  b.time,\n  t.label AS metric,\n  CASE WHEN o.time IS NOT NULL OR e.count IS NOT NULL THEN COALESCE(e.count, 0) END AS value\nFROM buckets b\nCROSS JOIN types t\nLEFT JOIN observations o ON o.time = b.time\nLEFT JOIN events e ON e.time = b.time AND e.event_type = t.event_type\nORDER BY b.time, t.label;",
+          "refId": "A"
         }
       ],
-      "title": "Channel bonding history",
+      "title": "Modem event counts",
       "type": "timeseries"
     },
     {
@@ -1887,8 +1879,8 @@
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 16,
+        "h": 10,
+        "w": 24,
         "x": 0,
         "y": 94
       },
@@ -1936,8 +1928,21 @@
         }
       ],
       "description": "The newest modem events by first observation time, with modem time and event type. Routine collector login events are hidden.",
-      "title": "Modem events",
+      "title": "Modem event log",
       "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 104
+      },
+      "id": 30,
+      "panels": [],
+      "title": "Public IP",
+      "type": "row"
     },
     {
       "datasource": {
@@ -1975,10 +1980,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 94
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 105
       },
       "id": 23,
       "options": {
@@ -2067,130 +2072,24 @@
       "type": "state-timeline"
     },
     {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "bfdoxbtd5wveoc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "fillOpacity": 70,
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineWidth": 0,
-            "spanNulls": false
-          },
-          "mappings": [
-            {
-              "options": {
-                "QAM256": {
-                  "color": "orange",
-                  "index": 0
-                },
-                "OFDM PLC": {
-                  "color": "blue",
-                  "index": 1
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
+      "collapsed": false,
       "gridPos": {
-        "h": 13,
+        "h": 1,
         "w": 24,
         "x": 0,
-        "y": 102
+        "y": 111
       },
-      "id": 19,
-      "options": {
-        "alignValue": "left",
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "mergeValues": true,
-        "rowHeight": 0.9,
-        "showValue": "auto",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.3",
-      "targets": [
-        {
-          "dataset": "s33mon",
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "bfdoxbtd5wveoc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  pulled_at AS time,\n  'Channel ' || channel_id::text AS metric,\n  modulation AS state\nFROM downstream_channel\nWHERE $__timeFilter(pulled_at)\nORDER BY time, metric;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "description": "The modulation reported by each downstream channel. A state change can identify a provider channel reconfiguration.",
-      "title": "Downstream modulation",
-      "transformations": [
-        {
-          "id": "partitionByValues",
-          "options": {
-            "fields": ["metric"],
-            "keepFields": false,
-            "naming": {
-              "asLabels": true
-            }
-          }
-        }
-      ],
-      "type": "state-timeline"
+      "id": 31,
+      "panels": [],
+      "title": "Clock drift",
+      "type": "row"
     },
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "Collection time minus modem system time after time-zone conversion. Positive values mean that the modem clock trails collection time.",
+      "description": "Collection time minus modem time, in minutes. Positive values mean that the modem clock trails collection time. Each bucket shows its average.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2240,8 +2139,8 @@
               }
             ]
           },
-          "unit": "s",
-          "decimals": 0
+          "unit": "suffix: min",
+          "decimals": 2
         },
         "overrides": []
       },
@@ -2249,7 +2148,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 115
+        "y": 112
       },
       "id": 25,
       "options": {
@@ -2276,11 +2175,11 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\n  time_bucket('$resolution'::interval, p.pulled_at) AS time,\n  AVG(EXTRACT(EPOCH FROM p.pulled_at) - ci.system_time_unix) AS \"Clock offset\"\nFROM pull p\nJOIN customer_status_connection_info ci ON ci.pull_id = p.id\nWHERE $__timeFilter(p.pulled_at)\nGROUP BY 1\nORDER BY 1;",
+          "rawSql": "SELECT\n  time_bucket('$resolution'::interval, p.pulled_at) AS time,\n  AVG(EXTRACT(EPOCH FROM p.pulled_at) - ci.system_time_unix) / 60.0 AS \"Clock drift\"\nFROM pull p\nJOIN customer_status_connection_info ci ON ci.pull_id = p.id\nWHERE $__timeFilter(p.pulled_at)\nGROUP BY 1\nORDER BY 1;",
           "refId": "A"
         }
       ],
-      "title": "Modem clock offset",
+      "title": "Clock drift history",
       "type": "timeseries"
     }
   ],
