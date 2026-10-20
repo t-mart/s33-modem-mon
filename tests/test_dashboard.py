@@ -158,3 +158,43 @@ def test_clock_drift_preserves_sign_and_subminute_precision(query, seconds):
         rows = query(panel_id, fixtures)
         assert len(rows) == 1
         assert float(rows[0][1]) == pytest.approx(seconds / 60)
+
+
+@pytest.mark.parametrize(
+    "samples,expected_minutes",
+    [
+        (
+            [("17:55", 3600), ("18:00", 3902), ("18:05", 60), ("18:10", 358)],
+            [4],
+        ),
+        ([("17:55", 60), ("18:10", 300)], [5]),
+        ([("17:55", 3600), ("18:00", 10)], [59]),
+        ([("18:00", 60), ("18:05", 358), ("18:10", 660)], []),
+        ([("17:55", 3600), ("18:35", 60)], []),
+    ],
+    ids=[
+        "uptime-reset",
+        "reset-across-gap",
+        "range-boundary",
+        "jitter",
+        "outside-range",
+    ],
+)
+def test_reboots_use_uptime_and_include_previous_sample(
+    query, samples, expected_minutes
+):
+    values = ", ".join(
+        f"({index}, '2026-10-20 {time}:00+00'::timestamptz, {uptime})"
+        for index, (time, uptime) in enumerate(samples)
+    )
+    rows = query(
+        32,
+        f"""
+        observations(id, pulled_at, uptime) AS (VALUES {values}),
+        pull AS (SELECT id, pulled_at FROM observations),
+        customer_status_connection_info AS (
+          SELECT id AS pull_id, uptime AS system_uptime_seconds FROM observations
+        )
+        """,
+    )
+    assert [estimated.minute for estimated, _ in rows] == expected_minutes

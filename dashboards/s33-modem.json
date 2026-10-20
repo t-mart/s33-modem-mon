@@ -48,7 +48,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 4,
+        "w": 8,
         "x": 0,
         "y": 0
       },
@@ -137,8 +137,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 4,
-        "x": 4,
+        "w": 8,
+        "x": 8,
         "y": 0
       },
       "id": 10,
@@ -225,8 +225,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 4,
-        "x": 8,
+        "w": 8,
+        "x": 16,
         "y": 0
       },
       "id": 20,
@@ -318,9 +318,9 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 4,
-        "x": 12,
-        "y": 0
+        "w": 8,
+        "x": 0,
+        "y": 6
       },
       "id": 21,
       "options": {
@@ -377,9 +377,9 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 4,
-        "x": 16,
-        "y": 0
+        "w": 8,
+        "x": 8,
+        "y": 6
       },
       "id": 26,
       "options": {
@@ -439,9 +439,9 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 4,
-        "x": 20,
-        "y": 0
+        "w": 8,
+        "x": 16,
+        "y": 6
       },
       "id": 27,
       "options": {
@@ -486,7 +486,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 12
       },
       "id": 5,
       "panels": [],
@@ -558,7 +558,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 13
       },
       "id": 14,
       "options": {
@@ -657,7 +657,7 @@
         "h": 8,
         "w": 16,
         "x": 0,
-        "y": 15
+        "y": 21
       },
       "id": 13,
       "interval": "5m",
@@ -756,7 +756,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 15
+        "y": 21
       },
       "id": 22,
       "options": {
@@ -884,7 +884,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 29
       },
       "id": 1,
       "options": {
@@ -1024,7 +1024,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 37
       },
       "id": 2,
       "options": {
@@ -1137,7 +1137,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 45
       },
       "id": 18,
       "options": {
@@ -1240,7 +1240,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 53
       },
       "id": 19,
       "options": {
@@ -1313,7 +1313,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 65
       },
       "id": 6,
       "panels": [],
@@ -1414,7 +1414,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 66
       },
       "id": 7,
       "options": {
@@ -1527,7 +1527,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 74
       },
       "id": 8,
       "options": {
@@ -1584,7 +1584,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 82
       },
       "id": 28,
       "panels": [],
@@ -1644,7 +1644,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 77
+        "y": 83
       },
       "id": 17,
       "options": {
@@ -1700,7 +1700,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 91
       },
       "id": 29,
       "panels": [],
@@ -1772,7 +1772,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 86
+        "y": 92
       },
       "id": 24,
       "options": {
@@ -1882,7 +1882,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 94
+        "y": 100
       },
       "id": 12,
       "options": {
@@ -1932,12 +1932,65 @@
       "type": "table"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Reboots first detected in the selected range. Estimates use collection time minus uptime, with a 30-second tolerance. Multiple reboots between pulls can remain invisible.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 110
+      },
+      "id": 32,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "First observed"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH samples AS (\n  (SELECT p.pulled_at, ci.system_uptime_seconds\n   FROM pull p\n   JOIN customer_status_connection_info ci ON ci.pull_id = p.id\n   WHERE p.pulled_at < $__timeFrom()\n   ORDER BY p.pulled_at DESC\n   LIMIT 1)\n  UNION ALL\n  SELECT p.pulled_at, ci.system_uptime_seconds\n  FROM pull p\n  JOIN customer_status_connection_info ci ON ci.pull_id = p.id\n  WHERE $__timeFilter(p.pulled_at)\n), boots AS (\n  SELECT pulled_at,\n    pulled_at - system_uptime_seconds * interval '1 second' AS boot_at\n  FROM samples\n), changes AS (\n  SELECT *,\n    lag(boot_at) OVER (ORDER BY pulled_at) AS previous_boot_at,\n    lag(pulled_at) OVER (ORDER BY pulled_at) AS previous_pull\n  FROM boots\n)\nSELECT\n  date_trunc('second', boot_at) AS \"Estimated reboot\",\n  pulled_at AS \"First observed\"\nFROM changes\nWHERE boot_at > previous_boot_at + interval '30 seconds'\n  AND boot_at >= previous_pull - interval '30 seconds'\nORDER BY pulled_at DESC\nLIMIT 100;",
+          "refId": "A"
+        }
+      ],
+      "title": "Modem reboots",
+      "type": "table"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 104
+        "y": 115
       },
       "id": 30,
       "panels": [],
@@ -1983,7 +2036,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 105
+        "y": 116
       },
       "id": 23,
       "options": {
@@ -2077,7 +2130,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 111
+        "y": 122
       },
       "id": 31,
       "panels": [],
@@ -2148,7 +2201,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 123
       },
       "id": 25,
       "options": {
