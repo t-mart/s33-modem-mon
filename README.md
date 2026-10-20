@@ -146,7 +146,10 @@ Log limits and identical records can hide events, so counts do not establish out
 The event table retains both timestamps and includes unrecognized messages as `other`.
 Clock drift compares collection time with modem time after time-zone conversion.
 Values use minutes with two decimals, instead of whole hours.
-Positive values mean that the modem clock trails collection time. The collector still interprets modem timestamps as Eastern time.
+Positive values mean that the modem clock trails collection time.
+The collector interprets modem timestamps as fixed UTC-5, without daylight saving.
+Previously, `America/New_York` added a false hour of drift during daylight saving.
+For existing databases, follow the [timestamp repair procedure](scripts/README.md) before the updated collector starts.
 
 Codeword rates use stacked bars with a duration-weighted average for each channel, instead of lines with separate totals.
 Counter decreases do not contribute to these rates.

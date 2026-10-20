@@ -1,6 +1,8 @@
 """The modem returns delimited strings for almost everything, so the parsers
 are where bugs hide. These fixtures are shaped like real responses."""
 
+from datetime import datetime
+
 import pytest
 
 from s33mon.models import (
@@ -44,8 +46,35 @@ def test_connection_info_from_response() -> None:
     )
     assert info.system_uptime_seconds == 6 * 86400 + 52 * 60 + 22
     assert info.network_access == "Allowed"
-    # 2026-02-18 01:04:01 in America/New_York (EST, UTC-5)
+    # 2026-02-18 01:04:01 at UTC-5.
     assert info.system_time_unix == 1771394641
+
+
+@pytest.mark.parametrize(
+    "wall_time,utc_time",
+    [
+        ("2026-02-18 01:04:01", "2026-02-18T06:04:01+00:00"),
+        ("2026-03-08 01:59:59", "2026-03-08T06:59:59+00:00"),
+        ("2026-03-08 02:30:00", "2026-03-08T07:30:00+00:00"),
+        ("2026-03-08 03:00:00", "2026-03-08T08:00:00+00:00"),
+        ("2026-10-20 16:32:00", "2026-10-20T21:32:00+00:00"),
+        ("2026-11-01 01:30:00", "2026-11-01T06:30:00+00:00"),
+        ("2026-11-01 02:00:00", "2026-11-01T07:00:00+00:00"),
+    ],
+)
+def test_modem_timestamps_use_fixed_utc_minus_five(wall_time, utc_time):
+    wall = datetime.fromisoformat(wall_time)
+    expected = int(datetime.fromisoformat(utc_time).timestamp())
+    info = CustomerStatusConnectionInfo.from_response(
+        {
+            "CustomerConnSystemUpTime": "00h:01m:00s",
+            "CustomerCurSystemTime": wall.strftime("%a %b %d %H:%M:%S %Y"),
+            "CustomerConnNetworkAccess": "Allowed",
+        }
+    )
+    entry = LogEntry.from_string(wall.strftime("0^%H:%M:%S^%d/%m/%Y^6^event"))
+    assert info.system_time_unix == expected
+    assert entry.timestamp_unix == expected
 
 
 def test_startup_sequence_strips_frequency_units() -> None:
@@ -117,7 +146,7 @@ def test_log_entry_parses_day_first_dates() -> None:
     entry = LogEntry.from_string("0^20:20:27^17/2/2026^6^US profile assignment change.")
     assert entry.level == 6
     assert entry.message == "US profile assignment change."
-    # 17 Feb 2026 20:20:27 in America/New_York (EST, UTC-5)
+    # 17 Feb 2026 20:20:27 at UTC-5.
     assert entry.timestamp_unix == 1771377627
 
 

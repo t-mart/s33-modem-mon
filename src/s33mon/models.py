@@ -7,11 +7,10 @@ ModemStats, and both the CLI and the database layer pick it up automatically.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import ClassVar, NewType, TypedDict
-from zoneinfo import ZoneInfo
 
-EASTERN = ZoneInfo("America/New_York")
+MODEM_TIMEZONE = timezone(timedelta(hours=-5))
 
 HNAPAction = NewType("HNAPAction", str)
 
@@ -70,7 +69,7 @@ class CustomerStatusConnectionInfo:
         # example: "Wed Feb 18 01:04:01 2026"
         system_time_unix = int(
             datetime.strptime(data["CustomerCurSystemTime"], "%a %b %d %H:%M:%S %Y")
-            .replace(tzinfo=EASTERN)
+            .replace(tzinfo=MODEM_TIMEZONE)
             .timestamp()
         )
         return cls(
@@ -176,7 +175,7 @@ class LogEntry:
         parts = s.split("^")
         timestamp_unix = int(
             datetime.strptime(f"{parts[2]} {parts[1]}", "%d/%m/%Y %H:%M:%S")
-            .replace(tzinfo=EASTERN)
+            .replace(tzinfo=MODEM_TIMEZONE)
             .timestamp()
         )
         return cls(
