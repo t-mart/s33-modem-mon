@@ -20,10 +20,21 @@ def query():
     dashboard = json.loads(
         (Path(__file__).parents[1] / "dashboards/s33-modem.json").read_text()
     )
-    panels = {panel["id"]: panel for panel in dashboard["panels"]}
+    queries = {
+        panel["id"]: panel["targets"][0]["rawSql"]
+        for panel in dashboard["panels"]
+        if panel.get("targets")
+    }
+    queries.update(
+        {
+            annotation["name"]: annotation["target"]["rawSql"]
+            for annotation in dashboard["annotations"]["list"]
+            if "target" in annotation
+        }
+    )
 
     def execute(panel_id, fixtures, resolution="5m"):
-        sql = panels[panel_id]["targets"][0]["rawSql"]
+        sql = queries[panel_id]
         start, end = "'2026-10-20 18:00:00+00'", "'2026-10-20 18:30:00+00'"
         sql = sql.replace("$resolution", resolution)
         sql = sql.replace("$__timeFrom()", start).replace("$__timeTo()", end)
@@ -198,3 +209,34 @@ def test_reboots_use_uptime_and_include_previous_sample(
         """,
     )
     assert [estimated.minute for estimated, _ in rows] == expected_minutes
+
+
+@pytest.mark.parametrize(
+    "samples,expected_times",
+    [
+        ([("17:55", 3600), ("18:05", 60), ("18:10", 358)], ["18:04:00"]),
+        ([("17:55", 60), ("18:10", 300)], ["18:05:00"]),
+        ([("18:25", 3600), ("18:35", 360)], ["18:29:00"]),
+        ([("17:55", 3600), ("18:00", 10)], []),
+        ([("18:00", 60), ("18:05", 358)], []),
+    ],
+    ids=["reset", "reset-across-gap", "late-observation", "outside-range", "jitter"],
+)
+def test_reboot_markers_use_estimated_time(query, samples, expected_times):
+    values = ", ".join(
+        f"({index}, '2026-10-20 {time}:00+00'::timestamptz, {uptime})"
+        for index, (time, uptime) in enumerate(samples)
+    )
+    rows = query(
+        "Modem reboots",
+        f"""
+        observations(id, pulled_at, uptime) AS (VALUES {values}),
+        pull AS (SELECT id, pulled_at FROM observations),
+        customer_status_connection_info AS (
+          SELECT id AS pull_id, uptime AS system_uptime_seconds FROM observations
+        )
+        """,
+    )
+    assert [(time.strftime("%H:%M:%S"), text, tags) for time, text, tags in rows] == [
+        (time, "Estimated modem reboot", "reboot") for time in expected_times
+    ]

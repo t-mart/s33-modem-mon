@@ -133,10 +133,11 @@ The `modem_event` view classifies stored log messages without changes to their t
 The monitor creates or updates this view at startup.
 
 Import `dashboards/s33-modem.json` after the monitor updates the schema.
-The dashboard separates modem events, public IP history, clock drift, and channel data into sections.
+The dashboard separates modem events, public IP history, and channel data into sections.
 The header uses two rows and includes the current public IP and clock drift.
 The reboot table estimates restart times from collection time and modem uptime.
-It lists reboots first detected within the selected range, without markers.
+It lists reboots first detected within the selected range.
+Clock drift history appears in Modem events with markers at estimated reboot times.
 
 Event counts use the first observation time, not the modem event time.
 Each display bucket counts records first observed within that bucket, by event type.

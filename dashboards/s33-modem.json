@@ -12,6 +12,33 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "bfdoxbtd5wveoc"
+        },
+        "enable": true,
+        "filter": {
+          "exclude": false,
+          "ids": [
+            25
+          ]
+        },
+        "hide": true,
+        "iconColor": "#FF9830",
+        "name": "Modem reboots",
+        "target": {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH samples AS (\n  (SELECT p.pulled_at, ci.system_uptime_seconds\n   FROM pull p\n   JOIN customer_status_connection_info ci ON ci.pull_id = p.id\n   WHERE p.pulled_at < $__timeFrom()\n   ORDER BY p.pulled_at DESC\n   LIMIT 1)\n  UNION ALL\n  SELECT p.pulled_at, ci.system_uptime_seconds\n  FROM pull p\n  JOIN customer_status_connection_info ci ON ci.pull_id = p.id\n  WHERE $__timeFilter(p.pulled_at)\n  UNION ALL\n  (SELECT p.pulled_at, ci.system_uptime_seconds\n   FROM pull p\n   JOIN customer_status_connection_info ci ON ci.pull_id = p.id\n   WHERE p.pulled_at > $__timeTo()\n   ORDER BY p.pulled_at\n   LIMIT 1)\n), boots AS (\n  SELECT pulled_at,\n    pulled_at - system_uptime_seconds * interval '1 second' AS boot_at\n  FROM samples\n), changes AS (\n  SELECT *,\n    lag(boot_at) OVER (ORDER BY pulled_at) AS previous_boot_at,\n    lag(pulled_at) OVER (ORDER BY pulled_at) AS previous_pull\n  FROM boots\n)\nSELECT\n  date_trunc('second', boot_at) AS time,\n  'Estimated modem reboot' AS text,\n  'reboot' AS tags\nFROM changes\nWHERE boot_at > previous_boot_at + interval '30 seconds'\n  AND boot_at >= previous_pull - interval '30 seconds'\n  AND $__timeFilter(boot_at)\nORDER BY boot_at;",
+          "refId": "Anno"
+        }
       }
     ]
   },
@@ -1811,6 +1838,104 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
+      "description": "Collection time minus modem time, in minutes. Positive values mean that the modem clock trails collection time. Each bucket shows its average. Markers show estimated reboot times from uptime data.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "suffix: min",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 100
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time_bucket('$resolution'::interval, p.pulled_at) AS time,\n  AVG(EXTRACT(EPOCH FROM p.pulled_at) - ci.system_time_unix) / 60.0 AS \"Clock drift\"\nFROM pull p\nJOIN customer_status_connection_info ci ON ci.pull_id = p.id\nWHERE $__timeFilter(p.pulled_at)\nGROUP BY 1\nORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Clock drift history",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1882,7 +2007,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 100
+        "y": 108
       },
       "id": 12,
       "options": {
@@ -1953,7 +2078,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 110
+        "y": 118
       },
       "id": 32,
       "options": {
@@ -1990,7 +2115,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 115
+        "y": 123
       },
       "id": 30,
       "panels": [],
@@ -2036,7 +2161,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 116
+        "y": 124
       },
       "id": 23,
       "options": {
@@ -2123,117 +2248,6 @@
         }
       ],
       "type": "state-timeline"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 122
-      },
-      "id": 31,
-      "panels": [],
-      "title": "Clock drift",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "bfdoxbtd5wveoc"
-      },
-      "description": "Collection time minus modem time, in minutes. Positive values mean that the modem clock trails collection time. Each bucket shows its average.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 3,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "suffix: min",
-          "decimals": 2
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 123
-      },
-      "id": 25,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.3",
-      "targets": [
-        {
-          "dataset": "s33mon",
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "bfdoxbtd5wveoc"
-          },
-          "editorMode": "code",
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  time_bucket('$resolution'::interval, p.pulled_at) AS time,\n  AVG(EXTRACT(EPOCH FROM p.pulled_at) - ci.system_time_unix) / 60.0 AS \"Clock drift\"\nFROM pull p\nJOIN customer_status_connection_info ci ON ci.pull_id = p.id\nWHERE $__timeFilter(p.pulled_at)\nGROUP BY 1\nORDER BY 1;",
-          "refId": "A"
-        }
-      ],
-      "title": "Clock drift history",
-      "type": "timeseries"
     }
   ],
   "preload": false,
