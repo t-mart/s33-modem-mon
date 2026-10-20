@@ -182,3 +182,16 @@ mount a config file and set `S33_CONFIG`.
 make build
 make push
 ```
+
+Pushes to `master` now publish the Docker image with the `latest` tag.
+Previously, publication required `make push`.
+
+Configure these repository settings under **Settings > Secrets and variables > Actions**:
+
+| Type | Name | Value |
+| ---- | ---- | ----- |
+| Secret | `DOCKERHUB_TOKEN` | Docker Hub personal access token with Read & Write permission |
+| Variable | `DOCKERHUB_USERNAME` | `tmmrtn` |
+| Variable | `DOCKERHUB_REPOSITORY` | `tmmrtn/s33-modem-mon` |
+
+Use a [Docker Hub personal access token](https://docs.docker.com/security/access-tokens/), not the account password.
