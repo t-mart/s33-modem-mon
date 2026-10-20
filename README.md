@@ -33,7 +33,7 @@ db:
   password: mypassword
   name: s33mon
 monitor:
-  interval: 900
+  interval: 300
 ```
 
 Every key is optional; anything you leave out falls back to the default shown
@@ -53,7 +53,7 @@ chmod 600 ~/.config/s33.yml
 | `db.user`          | `--db-user`       | `S33_DB_USER`         | postgres      |
 | `db.password`      | `--db-password`   | `S33_DB_PASSWORD`     | (required)    |
 | `db.name`          | `--db-name`       | `S33_DB_NAME`         | s33mon        |
-| `monitor.interval` | `--interval`      | `S33_INTERVAL`        | 900           |
+| `monitor.interval` | `--interval`      | `S33_INTERVAL`        | 300           |
 
 Passing a password on the command line makes it visible to anyone who can run
 `ps`. Prefer the config file or the environment.
@@ -113,13 +113,37 @@ Run the monitor. It creates the database and schema if they don't exist yet.
 $ s33 monitor
 2026-02-19 05:54:53,110 INFO s33mon.monitor: Connecting to myuser@localhost:5432/s33mon ...
 2026-02-19 05:54:53,157 INFO s33mon.store.timescale: Schema is ready.
-2026-02-19 05:54:53,157 INFO s33mon.monitor: Starting poll loop, modem: 192.168.0.1, interval: 900s
+2026-02-19 05:54:53,157 INFO s33mon.monitor: Starting poll loop, modem: 192.168.0.1, interval: 300s
 2026-02-19 05:54:53,305 INFO httpx: HTTP Request: POST https://192.168.0.1/HNAP1/ "HTTP/1.1 200 OK"
 2026-02-19 05:54:53,361 INFO httpx: HTTP Request: POST https://192.168.0.1/HNAP1/ "HTTP/1.1 200 OK"
 2026-02-19 05:55:00,120 INFO httpx: HTTP Request: POST https://192.168.0.1/HNAP1/ "HTTP/1.1 200 OK"
 2026-02-19 05:55:00,163 INFO s33mon.monitor: Pull #3 stored successfully.
-2026-02-19 05:55:00,163 INFO s33mon.monitor: Sleeping 900s ...
+2026-02-19 05:55:00,163 INFO s33mon.monitor: Sleeping 300s ...
 ```
+
+## Modem events
+
+The default pull interval is five minutes. Explicit configuration values override this default.
+Previously, the default interval was fifteen minutes.
+
+A failed public IP lookup no longer prevents storage of modem data.
+The collector logs a warning and omits the IP for that pull.
+
+The `modem_event` view classifies stored log messages without changes to their timestamps or original text.
+The monitor creates or updates this view at startup.
+
+Import `dashboards/s33-modem.json` after the monitor updates the schema.
+The dashboard adds event counts, link-event annotations, and the modem clock offset.
+Previously, modem events appeared only in a text table.
+
+Event counts use the first observation time, not the modem event time.
+Each display bucket counts newly observed records by event type.
+Buckets without pulls remain gaps. Historical records without observation times do not contribute to these counts.
+Log limits and identical records can hide events, so counts do not establish outage duration.
+
+The event table retains both timestamps and includes unrecognized messages as `other`.
+The clock offset compares collection time with modem time after time-zone conversion.
+Positive values mean that the modem clock trails collection time. The collector still interprets modem timestamps as Eastern time.
 
 ## Layout
 

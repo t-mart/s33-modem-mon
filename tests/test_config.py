@@ -17,7 +17,7 @@ from s33mon.config import (
 FILE_DATA = {
     "modem": {"host": "10.0.0.1", "username": "fileuser", "password": "filepass"},
     "db": {"host": "filedb", "port": 6543, "name": "filename"},
-    "monitor": {"interval": 300},
+    "monitor": {"interval": 600},
 }
 
 
@@ -26,7 +26,7 @@ def test_defaults_when_nothing_is_set() -> None:
     assert cfg.modem.host == DEFAULT_MODEM_HOST
     assert cfg.modem.password is None
     assert cfg.db.port == DEFAULT_DB_PORT
-    assert cfg.monitor.interval == DEFAULT_INTERVAL
+    assert cfg.monitor.interval == DEFAULT_INTERVAL == 300
 
 
 def test_file_beats_defaults() -> None:
@@ -34,7 +34,7 @@ def test_file_beats_defaults() -> None:
     assert cfg.modem.host == "10.0.0.1"
     assert cfg.modem.password == "filepass"
     assert cfg.db.port == 6543
-    assert cfg.monitor.interval == 300
+    assert cfg.monitor.interval == 600
     # not in the file, so still the default
     assert cfg.db.user == "postgres"
 
@@ -68,7 +68,7 @@ def test_unset_overrides_are_ignored() -> None:
     )
     assert cfg.modem.host == "10.0.0.1"
     assert cfg.db.port == 6543
-    assert cfg.monitor.interval == 300
+    assert cfg.monitor.interval == 600
 
 
 def test_numeric_strings_are_coerced() -> None:

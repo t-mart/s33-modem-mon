@@ -12,6 +12,28 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "bfdoxbtd5wveoc"
+        },
+        "enable": true,
+        "hide": false,
+        "iconColor": "#F2495C",
+        "name": "Modem link events (observed)",
+        "target": {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  first_observed_at AS time,\n  'Newly observed: ' || string_agg(event_type || ': ' || count::text, ', ' ORDER BY event_type) AS text,\n  string_agg(event_type, ',' ORDER BY event_type) AS tags\nFROM (\n  SELECT first_observed_at, event_type, COUNT(*) AS count\n  FROM modem_event\n  WHERE $__timeFilter(first_observed_at)\n    AND event_type IN ('sync_failure', 't4_timeout')\n  GROUP BY first_observed_at, event_type\n) events\nGROUP BY first_observed_at\nORDER BY first_observed_at;",
+          "refId": "A"
+        }
       }
     ]
   },
@@ -195,7 +217,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "The elapsed time since the collector stored the newest modem sample.",
+      "description": "Time since the newest modem sample. Thresholds assume the default five-minute pull interval.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -211,11 +233,11 @@
               },
               {
                 "color": "orange",
-                "value": 1500
+                "value": 600
               },
               {
                 "color": "red",
-                "value": 2100
+                "value": 900
               }
             ]
           },
@@ -358,12 +380,111 @@
       "type": "stat"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Counts use first observation time. Buckets without pulls remain gaps. Log limits and identical records can hide events.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 85,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 0,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    time_bucket('$resolution'::interval, ($__timeFrom())::timestamptz),\n    time_bucket('$resolution'::interval, ($__timeTo())::timestamptz),\n    '$resolution'::interval\n  ) AS time\n), types(event_type, label) AS (\n  VALUES\n    ('sync_failure', 'Sync failures'),\n    ('t3_timeout', 'T3 timeouts'),\n    ('t4_timeout', 'T4 timeouts'),\n    ('mdd_timeout', 'MDD timeouts'),\n    ('dhcp_failure', 'DHCP failures'),\n    ('dhcp_warning', 'DHCP warnings'),\n    ('profile_change', 'Profile changes'),\n    ('other', 'Other events')\n), observations AS (\n  SELECT DISTINCT time_bucket('$resolution'::interval, pulled_at) AS time\n  FROM pull\n  WHERE $__timeFilter(pulled_at)\n), events AS (\n  SELECT\n    time_bucket('$resolution'::interval, first_observed_at) AS time,\n    event_type,\n    COUNT(*) AS count\n  FROM modem_event\n  WHERE $__timeFilter(first_observed_at) AND event_type <> 'collector_login'\n  GROUP BY 1, 2\n)\nSELECT\n  b.time,\n  t.label AS metric,\n  CASE WHEN o.time IS NOT NULL OR e.count IS NOT NULL THEN COALESCE(e.count, 0) END AS value\nFROM buckets b\nCROSS JOIN types t\nLEFT JOIN observations o ON o.time = b.time\nLEFT JOIN events e ON e.time = b.time AND e.event_type = t.event_type\nORDER BY b.time, t.label;",
+          "refId": "A"
+        }
+      ],
+      "title": "Newly observed modem events",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 15
       },
       "id": 5,
       "panels": [],
@@ -453,7 +574,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 16
       },
       "id": 14,
       "options": {
@@ -582,10 +703,10 @@
         "h": 8,
         "w": 16,
         "x": 0,
-        "y": 16
+        "y": 24
       },
       "id": 13,
-      "interval": "15m",
+      "interval": "5m",
       "options": {
         "legend": {
           "calcs": [],
@@ -695,7 +816,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 16
+        "y": 24
       },
       "id": 22,
       "options": {
@@ -823,7 +944,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 32
       },
       "id": 1,
       "options": {
@@ -963,7 +1084,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 40
       },
       "id": 2,
       "options": {
@@ -1076,7 +1197,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 48
       },
       "id": 18,
       "options": {
@@ -1167,7 +1288,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 49
+        "y": 57
       },
       "id": 15,
       "options": {
@@ -1216,7 +1337,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 56
+        "y": 64
       },
       "id": 6,
       "panels": [],
@@ -1317,7 +1438,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 65
       },
       "id": 7,
       "options": {
@@ -1430,7 +1551,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 72
       },
       "id": 8,
       "options": {
@@ -1520,7 +1641,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 71
+        "y": 79
       },
       "id": 16,
       "options": {
@@ -1642,7 +1763,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 86
       },
       "id": 17,
       "options": {
@@ -1769,7 +1890,7 @@
         "h": 8,
         "w": 16,
         "x": 0,
-        "y": 86
+        "y": 94
       },
       "id": 12,
       "options": {
@@ -1793,7 +1914,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  first_observed_at AS \"Observed\",\n  timestamp_at AS \"Modem time\",\n  CASE level\n    WHEN 0 THEN 'Emergency'\n    WHEN 1 THEN 'Alert'\n    WHEN 2 THEN 'Critical'\n    WHEN 3 THEN 'Error'\n    WHEN 4 THEN 'Warning'\n    WHEN 5 THEN 'Notice'\n    WHEN 6 THEN 'Informational'\n    WHEN 7 THEN 'Debug'\n    ELSE level::text\n  END AS \"Level\",\n  message AS \"Message\"\nFROM log_entry\nWHERE $__timeFilter(first_observed_at)\n  AND message NOT LIKE 'Successful LAN WebGUI login from %'\nORDER BY first_observed_at DESC\nLIMIT 100;",
+          "rawSql": "SELECT\n  first_observed_at AS \"Observed\",\n  timestamp_at AS \"Modem time\",\n  CASE level\n    WHEN 0 THEN 'Emergency'\n    WHEN 1 THEN 'Alert'\n    WHEN 2 THEN 'Critical'\n    WHEN 3 THEN 'Error'\n    WHEN 4 THEN 'Warning'\n    WHEN 5 THEN 'Notice'\n    WHEN 6 THEN 'Informational'\n    WHEN 7 THEN 'Debug'\n    ELSE level::text\n  END AS \"Level\",\n  event_type AS \"Type\",\n  message AS \"Message\"\nFROM modem_event\nWHERE $__timeFilter(first_observed_at)\n  AND event_type <> 'collector_login'\nORDER BY first_observed_at DESC, timestamp_at DESC, message\nLIMIT 100;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1814,7 +1935,7 @@
           }
         }
       ],
-      "description": "The newest modem events by collection time. The query also shows modem time and excludes routine collector login messages.",
+      "description": "The newest modem events by first observation time, with modem time and event type. Routine collector login events are hidden.",
       "title": "Modem events",
       "type": "table"
     },
@@ -1823,7 +1944,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "The public IP address reported by each modem pull in the selected range. Colors follow each IP's first observation in retained history and repeat after ten distinct IPs.",
+      "description": "Public IP by modem pull. A failed lookup leaves a gap. Colors follow the first observation of each IP and repeat after ten IPs.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1857,7 +1978,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 86
+        "y": 94
       },
       "id": 23,
       "options": {
@@ -1887,7 +2008,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  p.pulled_at AS time,\n  'Public IP' AS metric,\n  oi.ip AS state\nFROM own_ip oi\nJOIN pull p ON p.id = oi.pull_id\nWHERE $__timeFilter(p.pulled_at)\nORDER BY p.pulled_at;",
+          "rawSql": "SELECT\n  p.pulled_at AS time,\n  'Public IP' AS metric,\n  oi.ip AS state\nFROM pull p\nLEFT JOIN own_ip oi ON oi.pull_id = p.id\nWHERE $__timeFilter(p.pulled_at)\nORDER BY p.pulled_at;",
           "refId": "A"
         },
         {
@@ -1997,7 +2118,7 @@
         "h": 13,
         "w": 24,
         "x": 0,
-        "y": 94
+        "y": 102
       },
       "id": 19,
       "options": {
@@ -2063,6 +2184,104 @@
         }
       ],
       "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Collection time minus modem system time after time-zone conversion. Positive values mean that the modem clock trails collection time.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 115
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "dataset": "s33mon",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time_bucket('$resolution'::interval, p.pulled_at) AS time,\n  AVG(EXTRACT(EPOCH FROM p.pulled_at) - ci.system_time_unix) AS \"Clock offset\"\nFROM pull p\nJOIN customer_status_connection_info ci ON ci.pull_id = p.id\nWHERE $__timeFilter(p.pulled_at)\nGROUP BY 1\nORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Modem clock offset",
+      "type": "timeseries"
     }
   ],
   "preload": false,
@@ -2074,7 +2293,7 @@
       {
         "auto": true,
         "auto_count": 100,
-        "auto_min": "15m",
+        "auto_min": "5m",
         "current": {
           "text": "1h",
           "value": "1h"
@@ -2083,6 +2302,11 @@
         "label": "Resolution",
         "name": "resolution",
         "options": [
+          {
+            "selected": false,
+            "text": "5m",
+            "value": "5m"
+          },
           {
             "selected": false,
             "text": "15m",
@@ -2129,7 +2353,7 @@
             "value": "30d"
           }
         ],
-        "query": "15m,30m,1h,3h,6h,12h,1d,7d,14d,30d",
+        "query": "5m,15m,30m,1h,3h,6h,12h,1d,7d,14d,30d",
         "refresh": 2,
         "type": "interval"
       }

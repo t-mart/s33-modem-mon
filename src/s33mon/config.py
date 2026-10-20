@@ -15,7 +15,7 @@ and looks like:
       password: secret
       name: s33mon
     monitor:
-      interval: 900
+      interval: 300
 
 Every key is optional. Because it can hold passwords, load_file warns when the
 file is readable by anyone but its owner.
@@ -39,7 +39,7 @@ DEFAULT_DB_HOST = "localhost"
 DEFAULT_DB_PORT = 5432
 DEFAULT_DB_USER = "postgres"
 DEFAULT_DB_NAME = "s33mon"
-DEFAULT_INTERVAL = 900
+DEFAULT_INTERVAL = 300
 
 
 class ConfigError(Exception):

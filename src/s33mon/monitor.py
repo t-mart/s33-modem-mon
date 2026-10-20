@@ -4,6 +4,8 @@ import contextlib
 import logging
 import time
 
+import httpx
+
 from s33mon.config import Config
 from s33mon.hnap import HNAPClient
 from s33mon.ip import get_own_ip
@@ -23,7 +25,16 @@ def do_pull(conn, cfg: Config) -> int:
     with HNAPClient(cfg.modem.host, cfg.modem.username, password) as client:
         client.login()
         stats = client.get_stats(get_all_hnap_actions())
-        return insert_pull(conn, stats, get_own_ip())
+
+    try:
+        own_ip = get_own_ip()
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        logger.warning(
+            "Public IP lookup failed; store modem data without an IP: %s", exc
+        )
+        own_ip = None
+
+    return insert_pull(conn, stats, own_ip)
 
 
 def retry_delay(interval: int, failed: bool) -> int:

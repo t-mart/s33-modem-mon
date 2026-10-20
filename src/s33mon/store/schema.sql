@@ -70,6 +70,26 @@ CREATE TABLE IF NOT EXISTS log_entry (
 CREATE INDEX IF NOT EXISTS log_entry_first_observed_at_idx
     ON log_entry (first_observed_at DESC);
 
+CREATE OR REPLACE VIEW modem_event AS
+SELECT
+    first_observed_at,
+    timestamp_at,
+    level,
+    message,
+    CASE
+        WHEN lower(message) LIKE 'successful lan webgui login from %' THEN 'collector_login'
+        WHEN lower(message) LIKE 'sync timing synchronization failure%' THEN 'sync_failure'
+        WHEN lower(message) LIKE '%t3 time%' THEN 't3_timeout'
+        WHEN lower(message) LIKE '%t4 time%' THEN 't4_timeout'
+        WHEN lower(message) LIKE 'mdd message timeout%' THEN 'mdd_timeout'
+        WHEN lower(message) LIKE 'dhcp failed%' THEN 'dhcp_failure'
+        WHEN lower(message) LIKE 'dhcp warning%' THEN 'dhcp_warning'
+        WHEN lower(message) LIKE 'ds profile assignment change%'
+          OR lower(message) LIKE 'us profile assignment change%' THEN 'profile_change'
+        ELSE 'other'
+    END AS event_type
+FROM log_entry;
+
 CREATE TABLE IF NOT EXISTS customer_status_software (
     pull_id             BIGINT NOT NULL PRIMARY KEY,
     spec_version        TEXT   NOT NULL,

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from ipaddress import ip_address
 
 import httpx
 
@@ -11,5 +12,5 @@ class OwnIp:
 
 
 def get_own_ip(url: str = IP_LOOKUP_URL) -> OwnIp:
-    data = httpx.get(url).raise_for_status().json()
-    return OwnIp(ip=data["ip"])
+    data = httpx.get(url, timeout=5).raise_for_status().json()
+    return OwnIp(ip=str(ip_address(data["ip"])))
