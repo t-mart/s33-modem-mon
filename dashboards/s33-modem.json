@@ -1107,133 +1107,519 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "The latest 100 changes between consecutive samples for each channel. Times show the first observation of each change.",
+      "description": "Reported channel frequencies at the last pull in the selected range. Orange marks QAM; blue marks OFDM. Hover for channel details.",
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            }
-          },
-          "mappings": [],
-          "noValue": ""
+            "show": "points",
+            "pointSize": {
+              "fixed": 7
+            },
+            "pointShape": "circle",
+            "fillOpacity": 85,
+            "pointStrokeWidth": 1,
+            "lineWidth": 0,
+            "axisPlacement": "auto"
+          }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Previous MHz"
+              "options": "Frequency"
             },
             "properties": [
               {
+                "id": "unit",
+                "value": "suffix: MHz"
+              },
+              {
                 "id": "decimals",
                 "value": 3
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Frequency"
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "New MHz"
+              "options": "Position"
             },
             "properties": [
               {
-                "id": "decimals",
-                "value": 3
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisGridShow",
+                "value": false
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": true,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modulation color"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "gray",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "blue",
+                      "value": 2
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Observed"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 5,
-        "w": 24,
         "x": 0,
-        "y": 45
+        "y": 45,
+        "w": 16,
+        "h": 7
       },
-      "id": 18,
+      "id": 33,
       "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
+        "mapping": "manual",
+        "series": [
           {
-            "desc": true,
-            "displayName": "First observed"
+            "name": {
+              "fixed": "Channel"
+            },
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "Frequency"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "Position"
+              }
+            },
+            "color": {
+              "matcher": {
+                "id": "byName",
+                "options": "Modulation color"
+              }
+            }
           }
-        ]
+        ],
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
       "pluginVersion": "12.3.3",
       "targets": [
         {
-          "dataset": "s33mon",
           "datasource": {
             "type": "grafana-postgresql-datasource",
             "uid": "bfdoxbtd5wveoc"
           },
+          "dataset": "s33mon",
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH samples AS (\n  (SELECT DISTINCT ON (channel_id) pulled_at, channel_id, frequency_hz\n   FROM downstream_channel\n   WHERE pulled_at < $__timeFrom()\n   ORDER BY channel_id, pulled_at DESC)\n  UNION ALL\n  SELECT pulled_at, channel_id, frequency_hz\n  FROM downstream_channel\n  WHERE $__timeFilter(pulled_at)\n), compared AS (\n  SELECT *,\n    lag(frequency_hz) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_hz\n  FROM samples\n), changes AS (\n  SELECT pulled_at, channel_id, previous_hz, frequency_hz\n  FROM compared\n  WHERE $__timeFilter(pulled_at)\n    AND previous_hz IS NOT NULL\n    AND frequency_hz <> previous_hz\n), latest AS (\n  SELECT * FROM changes\n  ORDER BY pulled_at DESC, channel_id\n  LIMIT 100\n)\nSELECT\n  pulled_at AS \"First observed\",\n  channel_id::text AS \"Channel\",\n  previous_hz / 1000000.0 AS \"Previous MHz\",\n  frequency_hz / 1000000.0 AS \"New MHz\"\nFROM latest\nUNION ALL\nSELECT\n  NULL::timestamptz,\n  CASE WHEN EXISTS (SELECT 1 FROM samples WHERE $__timeFilter(pulled_at))\n    THEN 'No frequency changes in this range'\n    ELSE 'No samples in this range'\n  END,\n  NULL::numeric,\n  NULL::numeric\nWHERE NOT EXISTS (SELECT 1 FROM changes)\nORDER BY \"First observed\" DESC, \"Channel\";",
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at FROM pull\n  WHERE $__timeFilter(pulled_at)\n  ORDER BY pulled_at DESC, id DESC\n  LIMIT 1\n)\nSELECT\n  c.frequency_hz / 1000000.0 AS \"Frequency\",\n  0 AS \"Position\",\n  CASE WHEN c.modulation LIKE 'QAM%' THEN 1 WHEN c.modulation LIKE 'OFDM%' THEN 2 ELSE 0 END AS \"Modulation color\",\n  c.channel_id::text AS \"Channel\",\n  c.modulation AS \"Modulation\",\n  p.pulled_at AS \"Observed\"\nFROM latest_pull p\nJOIN downstream_channel c ON c.pull_id = p.id AND c.pulled_at = p.pulled_at\nORDER BY c.frequency_hz, c.channel_id;",
           "refId": "A"
         }
       ],
-      "title": "Downstream frequency changes",
-      "type": "table"
+      "title": "Downstream channel frequencies",
+      "type": "xychart"
     },
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "The latest 100 changes between consecutive samples for each channel. Times show the first observation of each change.",
+      "description": "Channel counts by modulation at the last pull in the selected range. Frequency-plot tooltips identify individual channels.",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            }
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
           },
-          "mappings": [],
-          "noValue": ""
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          }
         },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 50
-      },
-      "id": 19,
-      "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
+        "overrides": [
           {
-            "desc": true,
-            "displayName": "First observed"
+            "matcher": {
+              "id": "byName",
+              "options": "Modulation"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^QAM",
+                      "result": {
+                        "color": "orange"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^OFDM",
+                      "result": {
+                        "color": "blue"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
           }
         ]
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 45,
+        "w": 8,
+        "h": 7
+      },
+      "id": 34,
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Modulation",
+        "showValue": "always",
+        "stacking": "none",
+        "groupWidth": 0.6,
+        "barWidth": 0.8,
+        "barRadius": 0,
+        "fullHighlight": false,
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "colorByField": "Modulation"
       },
       "pluginVersion": "12.3.3",
       "targets": [
         {
-          "dataset": "s33mon",
           "datasource": {
             "type": "grafana-postgresql-datasource",
             "uid": "bfdoxbtd5wveoc"
           },
+          "dataset": "s33mon",
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH samples AS (\n  (SELECT DISTINCT ON (channel_id) pulled_at, channel_id, modulation\n   FROM downstream_channel\n   WHERE pulled_at < $__timeFrom()\n   ORDER BY channel_id, pulled_at DESC)\n  UNION ALL\n  SELECT pulled_at, channel_id, modulation\n  FROM downstream_channel\n  WHERE $__timeFilter(pulled_at)\n), compared AS (\n  SELECT *,\n    lag(modulation) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_modulation\n  FROM samples\n), changes AS (\n  SELECT pulled_at, channel_id, previous_modulation, modulation\n  FROM compared\n  WHERE $__timeFilter(pulled_at)\n    AND previous_modulation IS NOT NULL\n    AND modulation <> previous_modulation\n), latest AS (\n  SELECT * FROM changes\n  ORDER BY pulled_at DESC, channel_id\n  LIMIT 100\n)\nSELECT\n  pulled_at AS \"First observed\",\n  channel_id::text AS \"Channel\",\n  previous_modulation AS \"Previous modulation\",\n  modulation AS \"New modulation\"\nFROM latest\nUNION ALL\nSELECT\n  NULL::timestamptz,\n  CASE WHEN EXISTS (SELECT 1 FROM samples WHERE $__timeFilter(pulled_at))\n    THEN 'No modulation changes in this range'\n    ELSE 'No samples in this range'\n  END,\n  NULL::text,\n  NULL::text\nWHERE NOT EXISTS (SELECT 1 FROM changes)\nORDER BY \"First observed\" DESC, \"Channel\";",
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at FROM pull\n  WHERE $__timeFilter(pulled_at)\n  ORDER BY pulled_at DESC, id DESC\n  LIMIT 1\n)\nSELECT c.modulation AS \"Modulation\", COUNT(*) AS \"Channels\",\n  string_agg(c.channel_id::text, ', ' ORDER BY c.channel_id) AS \"Channel IDs\"\nFROM latest_pull p\nJOIN downstream_channel c ON c.pull_id = p.id AND c.pulled_at = p.pulled_at\nGROUP BY c.modulation\nORDER BY count(*) DESC, c.modulation;",
           "refId": "A"
         }
       ],
-      "title": "Downstream modulation changes",
-      "type": "table"
+      "title": "Downstream modulation mix",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Observation time identifies the snapshot above. History counts cover all observed changes in the selected range, including returns to earlier values.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No samples"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Observed"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 24,
+        "h": 3
+      },
+      "id": 36,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "^(Observed|Snapshot|Frequency history|Modulation history)$",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 16
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "dataset": "s33mon",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at FROM pull\n  WHERE $__timeFilter(pulled_at)\n  ORDER BY pulled_at DESC, id DESC\n  LIMIT 1\n), samples AS (\n  (SELECT DISTINCT ON (channel_id) pulled_at, channel_id, frequency_hz, modulation\n   FROM downstream_channel\n   WHERE pulled_at < $__timeFrom()\n   ORDER BY channel_id, pulled_at DESC)\n  UNION ALL\n  SELECT pulled_at, channel_id, frequency_hz, modulation FROM downstream_channel\n  WHERE $__timeFilter(pulled_at)\n), compared AS (\n  SELECT *,\n    lag(frequency_hz) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_frequency_hz,\n    lag(modulation) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_modulation\n  FROM samples\n), totals AS (\n  SELECT COUNT(*) AS sample_count,\n    COUNT(*) FILTER (WHERE previous_frequency_hz IS NOT NULL AND frequency_hz <> previous_frequency_hz) AS frequency_hz_changes,\n    COUNT(DISTINCT channel_id) FILTER (WHERE previous_frequency_hz IS NOT NULL AND frequency_hz <> previous_frequency_hz) AS frequency_hz_channels,\n    COUNT(*) FILTER (WHERE previous_modulation IS NOT NULL AND modulation <> previous_modulation) AS modulation_changes,\n    COUNT(DISTINCT channel_id) FILTER (WHERE previous_modulation IS NOT NULL AND modulation <> previous_modulation) AS modulation_channels\n  FROM compared WHERE $__timeFilter(pulled_at)\n), snapshot AS (\n  SELECT COUNT(*) AS channel_count FROM latest_pull p\n  JOIN downstream_channel c ON c.pull_id = p.id AND c.pulled_at = p.pulled_at\n)\nSELECT\n  (SELECT pulled_at FROM latest_pull) AS \"Observed\",\n  CASE WHEN NOT EXISTS (SELECT 1 FROM latest_pull) THEN 'No pulls in this range'\n    WHEN channel_count = 0 THEN 'No channel samples at last pull'\n    ELSE channel_count || ' channels'\n  END AS \"Snapshot\",\n  CASE WHEN sample_count = 0 THEN 'No samples in this range'\n    WHEN frequency_hz_changes = 0 THEN 'No changes observed'\n    ELSE frequency_hz_changes || ' change' || CASE WHEN frequency_hz_changes = 1 THEN '' ELSE 's' END\n      || ' across ' || frequency_hz_channels || ' channel' || CASE WHEN frequency_hz_channels = 1 THEN '' ELSE 's' END\n  END AS \"Frequency history\",\n  CASE WHEN sample_count = 0 THEN 'No samples in this range'\n    WHEN modulation_changes = 0 THEN 'No changes observed'\n    ELSE modulation_changes || ' change' || CASE WHEN modulation_changes = 1 THEN '' ELSE 's' END\n      || ' across ' || modulation_channels || ' channel' || CASE WHEN modulation_channels = 1 THEN '' ELSE 's' END\n  END AS \"Modulation history\"\nFROM totals CROSS JOIN snapshot;",
+          "refId": "A"
+        }
+      ],
+      "title": "Downstream observation and changes",
+      "type": "stat"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 55
+      },
+      "id": 39,
+      "panels": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "description": "The latest 100 changes between consecutive samples for each channel. Times show the first observation of each change.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                }
+              },
+              "mappings": [],
+              "noValue": ""
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Previous MHz"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "New MHz"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 56
+          },
+          "id": 18,
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "First observed"
+              }
+            ]
+          },
+          "pluginVersion": "12.3.3",
+          "targets": [
+            {
+              "dataset": "s33mon",
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "bfdoxbtd5wveoc"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "WITH samples AS (\n  (SELECT DISTINCT ON (channel_id) pulled_at, channel_id, frequency_hz\n   FROM downstream_channel\n   WHERE pulled_at < $__timeFrom()\n   ORDER BY channel_id, pulled_at DESC)\n  UNION ALL\n  SELECT pulled_at, channel_id, frequency_hz\n  FROM downstream_channel\n  WHERE $__timeFilter(pulled_at)\n), compared AS (\n  SELECT *,\n    lag(frequency_hz) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_hz\n  FROM samples\n), changes AS (\n  SELECT pulled_at, channel_id, previous_hz, frequency_hz\n  FROM compared\n  WHERE $__timeFilter(pulled_at)\n    AND previous_hz IS NOT NULL\n    AND frequency_hz <> previous_hz\n), latest AS (\n  SELECT * FROM changes\n  ORDER BY pulled_at DESC, channel_id\n  LIMIT 100\n)\nSELECT\n  pulled_at AS \"First observed\",\n  channel_id::text AS \"Channel\",\n  previous_hz / 1000000.0 AS \"Previous MHz\",\n  frequency_hz / 1000000.0 AS \"New MHz\"\nFROM latest\nUNION ALL\nSELECT\n  NULL::timestamptz,\n  CASE WHEN EXISTS (SELECT 1 FROM samples WHERE $__timeFilter(pulled_at))\n    THEN 'No frequency changes in this range'\n    ELSE 'No samples in this range'\n  END,\n  NULL::numeric,\n  NULL::numeric\nWHERE NOT EXISTS (SELECT 1 FROM changes)\nORDER BY \"First observed\" DESC, \"Channel\";",
+              "refId": "A"
+            }
+          ],
+          "title": "Downstream frequency changes",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "description": "The latest 100 changes between consecutive samples for each channel. Times show the first observation of each change.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                }
+              },
+              "mappings": [],
+              "noValue": ""
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 62
+          },
+          "id": 19,
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "First observed"
+              }
+            ]
+          },
+          "pluginVersion": "12.3.3",
+          "targets": [
+            {
+              "dataset": "s33mon",
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "bfdoxbtd5wveoc"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "WITH samples AS (\n  (SELECT DISTINCT ON (channel_id) pulled_at, channel_id, modulation\n   FROM downstream_channel\n   WHERE pulled_at < $__timeFrom()\n   ORDER BY channel_id, pulled_at DESC)\n  UNION ALL\n  SELECT pulled_at, channel_id, modulation\n  FROM downstream_channel\n  WHERE $__timeFilter(pulled_at)\n), compared AS (\n  SELECT *,\n    lag(modulation) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_modulation\n  FROM samples\n), changes AS (\n  SELECT pulled_at, channel_id, previous_modulation, modulation\n  FROM compared\n  WHERE $__timeFilter(pulled_at)\n    AND previous_modulation IS NOT NULL\n    AND modulation <> previous_modulation\n), latest AS (\n  SELECT * FROM changes\n  ORDER BY pulled_at DESC, channel_id\n  LIMIT 100\n)\nSELECT\n  pulled_at AS \"First observed\",\n  channel_id::text AS \"Channel\",\n  previous_modulation AS \"Previous modulation\",\n  modulation AS \"New modulation\"\nFROM latest\nUNION ALL\nSELECT\n  NULL::timestamptz,\n  CASE WHEN EXISTS (SELECT 1 FROM samples WHERE $__timeFilter(pulled_at))\n    THEN 'No modulation changes in this range'\n    ELSE 'No samples in this range'\n  END,\n  NULL::text,\n  NULL::text\nWHERE NOT EXISTS (SELECT 1 FROM changes)\nORDER BY \"First observed\" DESC, \"Channel\";",
+              "refId": "A"
+            }
+          ],
+          "title": "Downstream modulation changes",
+          "type": "table"
+        }
+      ],
+      "title": "Downstream configuration changes",
+      "type": "row"
     },
     {
       "collapsed": false,
@@ -1241,7 +1627,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 56
       },
       "id": 6,
       "panels": [],
@@ -1342,7 +1728,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 56
+        "y": 57
       },
       "id": 7,
       "options": {
@@ -1398,79 +1784,232 @@
         "type": "grafana-postgresql-datasource",
         "uid": "bfdoxbtd5wveoc"
       },
-      "description": "The latest 100 changes between consecutive samples for each channel. Times show the first observation of each change.",
+      "description": "Reported widths at the last pull in the selected range. Absent channels do not retain values from older pulls.",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            }
+          "unit": "suffix: MHz",
+          "decimals": 3,
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
           },
-          "mappings": [],
-          "noValue": ""
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 65,
+        "w": 24,
+        "h": 7
+      },
+      "id": 35,
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Channel",
+        "showValue": "always",
+        "stacking": "none",
+        "groupWidth": 0.6,
+        "barWidth": 0.8,
+        "barRadius": 0,
+        "fullHighlight": false,
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "dataset": "s33mon",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at FROM pull\n  WHERE $__timeFilter(pulled_at)\n  ORDER BY pulled_at DESC, id DESC\n  LIMIT 1\n)\nSELECT 'Channel ' || c.channel_id::text AS \"Channel\", c.width_hz / 1000000.0 AS \"Width\"\nFROM latest_pull p\nJOIN upstream_channel c ON c.pull_id = p.id AND c.pulled_at = p.pulled_at\nORDER BY c.channel_id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Upstream channel widths",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "bfdoxbtd5wveoc"
+      },
+      "description": "Observation time identifies the snapshot above. History counts cover all observed changes in the selected range, including returns to earlier values.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No samples"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Previous MHz"
+              "options": "Observed"
             },
             "properties": [
               {
-                "id": "decimals",
-                "value": 3
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "New MHz"
-            },
-            "properties": [
-              {
-                "id": "decimals",
-                "value": 3
+                "id": "unit",
+                "value": "dateTimeAsIso"
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 5,
-        "w": 24,
         "x": 0,
-        "y": 64
+        "y": 72,
+        "w": 24,
+        "h": 3
       },
-      "id": 8,
+      "id": 37,
       "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "First observed"
-          }
-        ]
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "^(Observed|Snapshot|Width history)$",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 16
+        }
       },
       "pluginVersion": "12.3.3",
       "targets": [
         {
-          "dataset": "s33mon",
           "datasource": {
             "type": "grafana-postgresql-datasource",
             "uid": "bfdoxbtd5wveoc"
           },
+          "dataset": "s33mon",
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH samples AS (\n  (SELECT DISTINCT ON (channel_id) pulled_at, channel_id, width_hz\n   FROM upstream_channel\n   WHERE pulled_at < $__timeFrom()\n   ORDER BY channel_id, pulled_at DESC)\n  UNION ALL\n  SELECT pulled_at, channel_id, width_hz\n  FROM upstream_channel\n  WHERE $__timeFilter(pulled_at)\n), compared AS (\n  SELECT *,\n    lag(width_hz) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_hz\n  FROM samples\n), changes AS (\n  SELECT pulled_at, channel_id, previous_hz, width_hz\n  FROM compared\n  WHERE $__timeFilter(pulled_at)\n    AND previous_hz IS NOT NULL\n    AND width_hz <> previous_hz\n), latest AS (\n  SELECT * FROM changes\n  ORDER BY pulled_at DESC, channel_id\n  LIMIT 100\n)\nSELECT\n  pulled_at AS \"First observed\",\n  channel_id::text AS \"Channel\",\n  previous_hz / 1000000.0 AS \"Previous MHz\",\n  width_hz / 1000000.0 AS \"New MHz\"\nFROM latest\nUNION ALL\nSELECT\n  NULL::timestamptz,\n  CASE WHEN EXISTS (SELECT 1 FROM samples WHERE $__timeFilter(pulled_at))\n    THEN 'No width changes in this range'\n    ELSE 'No samples in this range'\n  END,\n  NULL::numeric,\n  NULL::numeric\nWHERE NOT EXISTS (SELECT 1 FROM changes)\nORDER BY \"First observed\" DESC, \"Channel\";",
+          "rawSql": "WITH latest_pull AS (\n  SELECT id, pulled_at FROM pull\n  WHERE $__timeFilter(pulled_at)\n  ORDER BY pulled_at DESC, id DESC\n  LIMIT 1\n), samples AS (\n  (SELECT DISTINCT ON (channel_id) pulled_at, channel_id, width_hz\n   FROM upstream_channel\n   WHERE pulled_at < $__timeFrom()\n   ORDER BY channel_id, pulled_at DESC)\n  UNION ALL\n  SELECT pulled_at, channel_id, width_hz FROM upstream_channel\n  WHERE $__timeFilter(pulled_at)\n), compared AS (\n  SELECT *,\n    lag(width_hz) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_width_hz\n  FROM samples\n), totals AS (\n  SELECT COUNT(*) AS sample_count,\n    COUNT(*) FILTER (WHERE previous_width_hz IS NOT NULL AND width_hz <> previous_width_hz) AS width_hz_changes,\n    COUNT(DISTINCT channel_id) FILTER (WHERE previous_width_hz IS NOT NULL AND width_hz <> previous_width_hz) AS width_hz_channels\n  FROM compared WHERE $__timeFilter(pulled_at)\n), snapshot AS (\n  SELECT COUNT(*) AS channel_count FROM latest_pull p\n  JOIN upstream_channel c ON c.pull_id = p.id AND c.pulled_at = p.pulled_at\n)\nSELECT\n  (SELECT pulled_at FROM latest_pull) AS \"Observed\",\n  CASE WHEN NOT EXISTS (SELECT 1 FROM latest_pull) THEN 'No pulls in this range'\n    WHEN channel_count = 0 THEN 'No channel samples at last pull'\n    ELSE channel_count || ' channels'\n  END AS \"Snapshot\",\n  CASE WHEN sample_count = 0 THEN 'No samples in this range'\n    WHEN width_hz_changes = 0 THEN 'No changes observed'\n    ELSE width_hz_changes || ' change' || CASE WHEN width_hz_changes = 1 THEN '' ELSE 's' END\n      || ' across ' || width_hz_channels || ' channel' || CASE WHEN width_hz_channels = 1 THEN '' ELSE 's' END\n  END AS \"Width history\"\nFROM totals CROSS JOIN snapshot;",
           "refId": "A"
         }
       ],
+      "title": "Upstream observation and changes",
+      "type": "stat"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 75
+      },
+      "id": 40,
+      "panels": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "bfdoxbtd5wveoc"
+          },
+          "description": "The latest 100 changes between consecutive samples for each channel. Times show the first observation of each change.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                }
+              },
+              "mappings": [],
+              "noValue": ""
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Previous MHz"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "New MHz"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 76
+          },
+          "id": 8,
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "First observed"
+              }
+            ]
+          },
+          "pluginVersion": "12.3.3",
+          "targets": [
+            {
+              "dataset": "s33mon",
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "bfdoxbtd5wveoc"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "WITH samples AS (\n  (SELECT DISTINCT ON (channel_id) pulled_at, channel_id, width_hz\n   FROM upstream_channel\n   WHERE pulled_at < $__timeFrom()\n   ORDER BY channel_id, pulled_at DESC)\n  UNION ALL\n  SELECT pulled_at, channel_id, width_hz\n  FROM upstream_channel\n  WHERE $__timeFilter(pulled_at)\n), compared AS (\n  SELECT *,\n    lag(width_hz) OVER (PARTITION BY channel_id ORDER BY pulled_at) AS previous_hz\n  FROM samples\n), changes AS (\n  SELECT pulled_at, channel_id, previous_hz, width_hz\n  FROM compared\n  WHERE $__timeFilter(pulled_at)\n    AND previous_hz IS NOT NULL\n    AND width_hz <> previous_hz\n), latest AS (\n  SELECT * FROM changes\n  ORDER BY pulled_at DESC, channel_id\n  LIMIT 100\n)\nSELECT\n  pulled_at AS \"First observed\",\n  channel_id::text AS \"Channel\",\n  previous_hz / 1000000.0 AS \"Previous MHz\",\n  width_hz / 1000000.0 AS \"New MHz\"\nFROM latest\nUNION ALL\nSELECT\n  NULL::timestamptz,\n  CASE WHEN EXISTS (SELECT 1 FROM samples WHERE $__timeFilter(pulled_at))\n    THEN 'No width changes in this range'\n    ELSE 'No samples in this range'\n  END,\n  NULL::numeric,\n  NULL::numeric\nWHERE NOT EXISTS (SELECT 1 FROM changes)\nORDER BY \"First observed\" DESC, \"Channel\";",
+              "refId": "A"
+            }
+          ],
+          "title": "Upstream width changes",
+          "type": "table"
+        }
+      ],
       "title": "Upstream width changes",
-      "type": "table"
+      "type": "row"
     },
     {
       "collapsed": false,
@@ -1478,7 +2017,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 76
       },
       "id": 28,
       "panels": [],
@@ -1538,7 +2077,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 77
       },
       "id": 17,
       "options": {
@@ -1594,7 +2133,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 85
       },
       "id": 29,
       "panels": [],
@@ -1666,7 +2205,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 79
+        "y": 86
       },
       "id": 24,
       "options": {
@@ -1764,7 +2303,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 87
+        "y": 94
       },
       "id": 25,
       "options": {
@@ -1874,7 +2413,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 95
+        "y": 102
       },
       "id": 12,
       "options": {
@@ -1945,7 +2484,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 105
+        "y": 112
       },
       "id": 32,
       "options": {
@@ -1982,7 +2521,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 110
+        "y": 117
       },
       "id": 30,
       "panels": [],
@@ -2028,7 +2567,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 111
+        "y": 118
       },
       "id": 23,
       "options": {

@@ -7,8 +7,21 @@ import psycopg2
 import pytest
 
 
+def panels_in(panels):
+    for panel in panels:
+        yield panel
+        yield from panels_in(panel.get("panels", []))
+
+
 @pytest.fixture(scope="module")
-def query():
+def dashboard():
+    return json.loads(
+        (Path(__file__).parents[1] / "dashboards/s33-modem.json").read_text()
+    )
+
+
+@pytest.fixture(scope="module")
+def query(dashboard):
     dsn = os.environ.get("S33_TEST_DSN")
     if not dsn:
         pytest.skip("Set S33_TEST_DSN to test dashboard SQL on TimescaleDB")
@@ -17,12 +30,9 @@ def query():
         connect_timeout=5,
         options="-c default_transaction_read_only=on -c statement_timeout=10000",
     )
-    dashboard = json.loads(
-        (Path(__file__).parents[1] / "dashboards/s33-modem.json").read_text()
-    )
     queries = {
         panel["id"]: panel["targets"][0]["rawSql"]
-        for panel in dashboard["panels"]
+        for panel in panels_in(dashboard["panels"])
         if panel.get("targets")
     }
     queries.update(
@@ -336,3 +346,129 @@ def test_channel_changes_distinguish_stable_data_from_absent_data(
         else "No samples in this range"
     )
     assert rows == [(None, message, None, None)]
+
+
+SNAPSHOT_FIXTURES = """
+pull AS (
+  SELECT id, time::timestamptz AS pulled_at FROM (VALUES
+    (1, '2026-10-20 17:55:00+00'),
+    (2, '2026-10-20 18:05:00+00'),
+    (3, '2026-10-20 18:25:00+00'),
+    (4, '2026-10-20 18:35:00+00')
+  ) pulls(id, time)
+), downstream_channel AS (
+  SELECT c.*, p.pulled_at FROM pull p JOIN (VALUES
+    (1, 1, 600000000, 'QAM256'), (1, 2, 620000000, 'OFDM PLC'),
+    (2, 1, 606000000, 'QAM64'), (2, 2, 620000000, 'OFDM PLC'), (2, 3, 632000000, 'QAM256'),
+    (3, 1, 612000000, 'QAM256'), (3, 2, 620000000, 'OFDM PLC'),
+    (4, 1, 630000000, 'QAM16')
+  ) c(pull_id, channel_id, frequency_hz, modulation) ON c.pull_id = p.id
+), upstream_channel AS (
+  SELECT c.*, p.pulled_at FROM pull p JOIN (VALUES
+    (1, 5, 6400000), (1, 6, 6400000),
+    (2, 5, 3200000), (2, 6, 6400000),
+    (3, 5, 6400000), (3, 8, 1600000),
+    (4, 5, 12800000)
+  ) c(pull_id, channel_id, width_hz) ON c.pull_id = p.id
+)
+"""
+
+
+def test_configuration_overviews_use_one_pull_inside_the_selected_range(query):
+    frequency = query(33, SNAPSHOT_FIXTURES)
+    assert [
+        (float(mhz), position, color, channel, modulation)
+        for mhz, position, color, channel, modulation, _ in frequency
+    ] == [(612, 0, 1, "1", "QAM256"), (620, 0, 2, "2", "OFDM PLC")]
+    assert all(observed.minute == 25 for *_, observed in frequency)
+    assert query(34, SNAPSHOT_FIXTURES) == [("OFDM PLC", 1, "2"), ("QAM256", 1, "1")]
+    assert [
+        (channel, float(width)) for channel, width in query(35, SNAPSHOT_FIXTURES)
+    ] == [("Channel 5", 6.4), ("Channel 8", 1.6)]
+
+
+@pytest.mark.parametrize("panel_id", [36, 37])
+def test_configuration_summaries_include_baseline_and_return_changes(query, panel_id):
+    [(observed, snapshot, *histories)] = query(panel_id, SNAPSHOT_FIXTURES)
+    assert observed.minute == 25
+    assert snapshot == "2 channels"
+    assert histories == ["2 changes across 1 channel"] * (2 if panel_id == 36 else 1)
+
+
+@pytest.mark.parametrize("panel_id", [33, 34, 35, 36, 37])
+def test_configuration_overviews_do_not_reuse_channels_from_an_older_pull(
+    query, panel_id
+):
+    fixtures = SNAPSHOT_FIXTURES.replace(
+        "(4, '2026-10-20 18:35:00+00')",
+        "(4, '2026-10-20 18:35:00+00'), (5, '2026-10-20 18:29:00+00')",
+    )
+    rows = query(panel_id, fixtures)
+    if panel_id < 36:
+        assert rows == []
+    else:
+        assert rows[0][0].minute == 29
+        assert rows[0][1] == "No channel samples at last pull"
+
+
+@pytest.mark.parametrize("panel_id", [33, 34, 35, 36, 37])
+def test_configuration_overviews_distinguish_absent_samples(query, panel_id):
+    rows = query(panel_id, SNAPSHOT_FIXTURES.replace("2026-10-20", "2026-10-21"))
+    if panel_id < 36:
+        assert rows == []
+    else:
+        assert rows[0][:2] == (None, "No pulls in this range")
+        assert all(value == "No samples in this range" for value in rows[0][2:])
+
+
+@pytest.mark.parametrize("panel_id", [36, 37])
+def test_configuration_history_totals_are_not_limited_to_the_detail_table(
+    query, panel_id
+):
+    fixtures = """
+      pull AS (
+        SELECT id, '2026-10-20 18:00:00+00'::timestamptz + id * interval '10 seconds' AS pulled_at
+        FROM generate_series(0, 125) ids(id)
+      ), downstream_channel AS (
+        SELECT id AS pull_id, pulled_at, 1 AS channel_id,
+          600000000 + (id % 2) * 6000000 AS frequency_hz, 'QAM256' AS modulation FROM pull
+      ), upstream_channel AS (
+        SELECT id AS pull_id, pulled_at, 1 AS channel_id,
+          3200000 + (id % 2) * 3200000 AS width_hz FROM pull
+      )
+    """
+    [row] = query(panel_id, fixtures)
+    assert row[2] == "125 changes across 1 channel"
+    if panel_id == 36:
+        assert row[3] == "No changes observed"
+
+
+def test_configuration_details_are_collapsed_and_layout_does_not_overlap(dashboard):
+    panels = list(panels_in(dashboard["panels"]))
+    assert len({p["id"] for p in panels}) == len(panels)
+    for panel_id, fields in [
+        (36, ["Observed", "Snapshot", "Frequency history", "Modulation history"]),
+        (37, ["Observed", "Snapshot", "Width history"]),
+    ]:
+        panel = next(p for p in panels if p["id"] == panel_id)
+        matcher = panel["options"]["reduceOptions"]["fields"]
+        assert matcher and all(re.fullmatch(matcher, name) for name in fields)
+    for row_id, children in [(39, {18, 19}), (40, {8})]:
+        row = next(p for p in panels if p["id"] == row_id)
+        assert row["collapsed"]
+        assert {p["id"] for p in row["panels"]} == children
+    for group in [
+        dashboard["panels"],
+        *(p["panels"] for p in panels if p.get("panels")),
+    ]:
+        for index, panel in enumerate(group):
+            a = panel["gridPos"]
+            assert 0 <= a["x"] < a["x"] + a["w"] <= 24
+            for other in group[index + 1 :]:
+                b = other["gridPos"]
+                assert (
+                    a["x"] >= b["x"] + b["w"]
+                    or b["x"] >= a["x"] + a["w"]
+                    or a["y"] >= b["y"] + b["h"]
+                    or b["y"] >= a["y"] + a["h"]
+                )
