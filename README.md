@@ -154,6 +154,10 @@ For existing databases, follow the [timestamp repair procedure](scripts/README.m
 
 Codeword rates use stacked bars with a duration-weighted average for each channel, instead of lines with separate totals.
 Counter decreases do not contribute to these rates.
+Downstream frequency, downstream modulation, and upstream width use compact changes tables instead of constant lines or long timelines.
+Each table lists the latest 100 changes with first-observation time, channel, previous value, and new value. Frequency and width use MHz.
+The tables compare raw samples and retain changes that occur within one display bucket.
+Stable data displays a no-changes message. Absent data displays a no-samples message.
 Channel bonding history shows missing and unlocked channel counts on separate timeline rows, instead of overlapping expected, present, and locked lines.
 Zero means complete. Negative missing counts indicate extra channels. Empty display buckets remain gaps.
 

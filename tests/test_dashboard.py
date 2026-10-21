@@ -240,3 +240,99 @@ def test_reboot_markers_use_estimated_time(query, samples, expected_times):
     assert [(time.strftime("%H:%M:%S"), text, tags) for time, text, tags in rows] == [
         (time, "Estimated modem reboot", "reboot") for time in expected_times
     ]
+
+
+@pytest.mark.parametrize(
+    "panel_id,table,column,values,expected",
+    [
+        (
+            18,
+            "downstream_channel",
+            "frequency_hz",
+            [600000000, 606000000, 612000000, 615125000],
+            [606, 612, 615.125],
+        ),
+        (
+            8,
+            "upstream_channel",
+            "width_hz",
+            [1600000, 3200000, 6400000, 2400000],
+            [3.2, 6.4, 2.4],
+        ),
+        (
+            19,
+            "downstream_channel",
+            "modulation",
+            ["'QAM16'", "'QAM256'", "'OFDM PLC'", "'QAM64'"],
+            ["QAM256", "OFDM PLC", "QAM64"],
+        ),
+    ],
+)
+def test_channel_changes_preserve_brief_changes_and_range_baselines(
+    query, panel_id, table, column, values, expected
+):
+    earlier, baseline, other, changed = values
+    rows = query(
+        panel_id,
+        f"""
+        {table} AS (
+          SELECT time::timestamptz AS pulled_at, channel_id, value AS {column}
+          FROM (VALUES
+            ('2026-10-20 17:50:00+00', 1, {earlier}),
+            ('2026-10-20 17:55:00+00', 1, {baseline}),
+            ('2026-10-20 17:55:00+00', 2, {other}),
+            ('2026-10-20 18:00:00+00', 1, {changed}),
+            ('2026-10-20 18:05:00+00', 1, {baseline}),
+            ('2026-10-20 18:10:00+00', 1, {baseline}),
+            ('2026-10-20 18:10:00+00', 2, {changed}),
+            ('2026-10-20 18:10:00+00', 3, {changed}),
+            ('2026-10-20 18:35:00+00', 1, {changed})
+          ) samples(time, channel_id, value)
+        )
+        """,
+        resolution="30m",
+    )
+    baseline_value, other_value, changed_value = expected
+    assert [
+        (
+            time.minute,
+            channel,
+            old if isinstance(old, str) else float(old),
+            new if isinstance(new, str) else float(new),
+        )
+        for time, channel, old, new in rows
+    ] == [
+        (10, "2", other_value, changed_value),
+        (5, "1", changed_value, baseline_value),
+        (0, "1", baseline_value, changed_value),
+    ]
+
+
+@pytest.mark.parametrize(
+    "panel_id,table,column,value,label",
+    [
+        (18, "downstream_channel", "frequency_hz", "606000000", "frequency"),
+        (8, "upstream_channel", "width_hz", "6400000", "width"),
+        (19, "downstream_channel", "modulation", "'QAM256'::text", "modulation"),
+    ],
+)
+@pytest.mark.parametrize("minutes", [[0, 5, 10], [-5, 35], []])
+def test_channel_changes_distinguish_stable_data_from_absent_data(
+    query, panel_id, table, column, value, label, minutes
+):
+    rows = query(
+        panel_id,
+        f"""
+        {table} AS (
+          SELECT '2026-10-20 18:00:00+00'::timestamptz + minute * interval '1 minute' AS pulled_at,
+            1 AS channel_id, {value} AS {column}
+          FROM unnest(ARRAY{minutes}::integer[]) AS offsets(minute)
+        )
+        """,
+    )
+    message = (
+        f"No {label} changes in this range"
+        if minutes == [0, 5, 10]
+        else "No samples in this range"
+    )
+    assert rows == [(None, message, None, None)]
